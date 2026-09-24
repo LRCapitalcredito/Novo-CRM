@@ -389,7 +389,8 @@ function App() {
                       download(`lr-capital-${today()}.json`, {
                         schemaVersion: 2,
                         exportedAt: new Date().toISOString(),
-                        ...state,
+                        operations:state.operations,
+                        activities:state.activities,
                       })
                     }
                   >
@@ -942,14 +943,14 @@ function App() {
                   </h2>
                   <p>
                     {repo.mode === "preview"
-                      ? "Os exemplos e suas alterações são gravados em um banco local neste computador. Duas abas desta prévia recebem as mudanças automaticamente."
+                      ? "A carteira de demonstração, os cadastros e a base recebida ficam gravados neste computador. Duas abas desta prévia recebem alterações de cadastro automaticamente."
                       : "As alterações são gravadas no Firestore e acompanhadas em tempo real pela equipe autorizada."}
                   </p>
                   <dl>
                     <dt>Dados</dt>
                     <dd>
                       {repo.mode === "preview"
-                        ? "Fictícios, para avaliação"
+                        ? "Demonstração e base recebida, identificadas em cada tela"
                         : "Da equipe autorizada"}
                     </dd>
                     <dt>Persistência</dt>

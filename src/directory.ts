@@ -280,10 +280,11 @@ export function directoryChanges(
   return Object.keys(next).filter(
     (k) =>
       !["id", "kind"].includes(k) &&
-      JSON.stringify(old?.[k as keyof DirectoryRecord]) !==
-        JSON.stringify((next as any)[k]),
+      stableValue(old?.[k as keyof DirectoryRecord]) !==
+        stableValue((next as any)[k]),
   );
 }
+function stableValue(value:unknown){return JSON.stringify(value,(_key,item)=>obj(item)?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);}
 export function whatsappUrl(phone: string) {
   let digits = phone.replace(/\D/g, "");
   if (digits.length === 10 || digits.length === 11) digits = "55" + digits;

@@ -18,6 +18,13 @@ import {
 } from "firebase/firestore";
 import type { Repository } from "./repository";
 import {
+  validateDirectory,
+  directoryChanges,
+  emptyDirectory,
+  type DirectoryRecord,
+  type DirectoryEvent,
+} from "./directory";
+import {
   validateOperation,
   type Session,
   type WorkspaceState,
@@ -143,10 +150,99 @@ export function firebaseRepository(config: Config): Repository {
         },
         failed,
       );
+      const c = onSnapshot(
+        collection(db, root, "directory"),
+        (snap) => {
+          const records = snap.docs.map((d) => {
+            const v = d.data();
+            return {
+              ...v,
+              id: d.id,
+              createdAt: iso(v.createdAt),
+              updatedAt: iso(v.updatedAt),
+            } as DirectoryRecord;
+          });
+          state = {
+            ...state,
+            directory: { ...(state.directory ?? emptyDirectory), records },
+          };
+          next(state);
+        },
+        failed,
+      );
+      const d = onSnapshot(
+        query(
+          collection(db, root, "directoryEvents"),
+          orderBy("at", "desc"),
+          limit(200),
+        ),
+        (snap) => {
+          state = {
+            ...state,
+            directory: {
+              ...(state.directory ?? emptyDirectory),
+              events: snap.docs.map(
+                (d) =>
+                  ({
+                    ...d.data(),
+                    id: d.id,
+                    at: iso(d.data().at),
+                  }) as DirectoryEvent,
+              ),
+            },
+          };
+          next(state);
+        },
+        failed,
+      );
       return () => {
         a();
         b();
+        c();
+        d();
       };
+    },
+    async saveDirectory(raw, expectedVersion) {
+      if (!auth.currentUser || !repo.session || repo.session.role === "reader")
+        throw new Error("Você não tem permissão para alterar cadastros.");
+      const input = validateDirectory(raw),
+        target = doc(db, root, "directory", input.id),
+        audit = doc(collection(db, root, "directoryEvents")),
+        actor = repo.session;
+      await runTransaction(db, async (tx) => {
+        const current = await tx.get(target),
+          old = current.exists() ? current.data() : null;
+        if ((old?.version ?? null) !== expectedVersion)
+          throw new Error(
+            "Este cadastro mudou em outra sessão. Reabra antes de salvar.",
+          );
+        if (old && old.kind !== input.kind)
+          throw new Error("Tipo de cadastro não pode ser alterado.");
+        if (input.kind === "manager") {
+          const bank = await tx.get(doc(db, root, "directory", input.bankId));
+          if (bank.data()?.kind !== "bank")
+            throw new Error("A instituição vinculada não existe.");
+        }
+        const version = (old?.version ?? 0) + 1;
+        tx.set(target, {
+          ...input,
+          version,
+          createdAt: old?.createdAt ?? serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          updatedBy: actor.uid,
+          lastEventId: audit.id,
+        });
+        tx.set(audit, {
+          entityId: input.id,
+          kind: input.kind,
+          name: input.name,
+          actor: actor.name,
+          actorUid: actor.uid,
+          at: serverTimestamp(),
+          version,
+          changes: directoryChanges(old as DirectoryRecord | null, input),
+        });
+      });
     },
     async save(raw, expectedVersion) {
       if (!auth.currentUser || !repo.session || repo.session.role === "reader")

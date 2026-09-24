@@ -73,6 +73,166 @@ beforeEach(async () => {
   });
 });
 const dbFor = (uid = "editor") => env.authenticatedContext(uid).firestore();
+const bankInput = {
+  id: "bank-test",
+  kind: "bank",
+  name: "Instituição fictícia",
+  notes: "",
+  source: "Teste",
+  archived: false,
+  type: "Banco",
+  color: "#123456",
+  logoUrl: "",
+  acceptsRestriction: null,
+  guarantees: {},
+};
+const managerInput = {
+  id: "manager-test",
+  kind: "manager",
+  name: "Contato fictício",
+  notes: "",
+  source: "Teste",
+  archived: false,
+  bankId: "bank-test",
+  minRevenueCents: null,
+  maxRevenueCents: null,
+  email: "",
+  phone: "",
+  city: "",
+  state: "",
+  serviceScope: "",
+  radiusKm: null,
+  servedStates: [],
+};
+async function writeDirectory(db, input, previous = null, options = {}) {
+  const version = (previous?.version ?? 0) + 1,
+    eventId = input.id + "-" + version;
+  const next = {
+    ...input,
+    version,
+    createdAt: previous?.createdAt ?? serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    updatedBy: "editor",
+    lastEventId: eventId,
+  };
+  const changes = Object.keys(input).filter(
+    (k) =>
+      !["id", "kind"].includes(k) &&
+      JSON.stringify(previous?.[k]) !== JSON.stringify(input[k]),
+  );
+  const batch = writeBatch(db);
+  batch.set(doc(db, `${root}/directory/${input.id}`), next);
+  if (!options.noAudit)
+    batch.set(doc(db, `${root}/directoryEvents/${eventId}`), {
+      entityId: input.id,
+      kind: input.kind,
+      name: input.name,
+      actor: "editor teste",
+      actorUid: "editor",
+      at: serverTimestamp(),
+      version,
+      changes,
+      ...options.eventPatch,
+    });
+  await batch.commit();
+}
+test("bancos e gerentes são vinculados, auditados e podem ser arquivados", async () => {
+  const db = dbFor();
+  await assertSucceeds(writeDirectory(db, bankInput));
+  await assertSucceeds(writeDirectory(db, managerInput));
+  const old = (await getDoc(doc(db, `${root}/directory/bank-test`))).data();
+  await assertSucceeds(
+    writeDirectory(db, { ...bankInput, archived: true }, old),
+  );
+  await assertSucceeds(
+    getDoc(doc(dbFor("reader"), `${root}/directory/manager-test`)),
+  );
+});
+test("cadastros recusam leitor, banco ausente e histórico falso", async () => {
+  await assertFails(writeDirectory(dbFor("reader"), bankInput));
+  await assertFails(writeDirectory(dbFor(), managerInput));
+  await assertFails(
+    writeDirectory(dbFor(), bankInput, null, { noAudit: true }),
+  );
+  await assertFails(
+    writeDirectory(dbFor(), bankInput, null, { eventPatch: { changes: [] } }),
+  );
+});
+test("garantias e faixa de faturamento têm validação no servidor", async () => {
+  const db = dbFor();
+  const guarantees = Object.fromEntries(
+    [
+      "Imóveis (Geral)",
+      "Imóvel Urbano",
+      "Imóvel Rural",
+      "Imóvel Operacional",
+      "Veículos Leves",
+      "Veículos Pesados",
+      "Recebíveis",
+      "Contratos",
+      "Aplicação Financeira",
+      "Aval / Fiador",
+      "Estoque",
+      "FGI / Limpa",
+      "Safra",
+      "Câmbio",
+      "Universal",
+    ].map((k) => [k, { rate: "Referência", termMonths: 60, ltvPercent: 70 }]),
+  );
+  await assertSucceeds(writeDirectory(db, { ...bankInput, guarantees }));
+  await assertFails(
+    writeDirectory(db, {
+      ...managerInput,
+      minRevenueCents: 200,
+      maxRevenueCents: 100,
+    }),
+  );
+  const old = (await getDoc(doc(db, `${root}/directory/bank-test`))).data();
+  await assertFails(
+    writeDirectory(
+      db,
+      {
+        ...bankInput,
+        guarantees: {
+          Universal: { rate: "", termMonths: 60, ltvPercent: 101 },
+        },
+      },
+      old,
+    ),
+  );
+  await assertFails(
+    writeDirectory(
+      db,
+      {
+        ...bankInput,
+        guarantees: {
+          Universal: {
+            rate: "",
+            termMonths: 60,
+            ltvPercent: 70,
+            other: "injetado",
+          },
+        },
+      },
+      old,
+    ),
+  );
+});
+test("tipo de cadastro, versão e histórico não podem ser adulterados", async () => {
+  const db = dbFor();
+  await writeDirectory(db, bankInput);
+  const old = (await getDoc(doc(db, `${root}/directory/bank-test`))).data();
+  await assertFails(writeDirectory(db, bankInput));
+  await assertFails(
+    writeDirectory(db, { ...managerInput, id: bankInput.id }, old),
+  );
+  await assertFails(
+    updateDoc(doc(db, `${root}/directoryEvents/bank-test-1`), {
+      name: "Alterado",
+    }),
+  );
+  await assertFails(deleteDoc(doc(db, `${root}/directory/bank-test`)));
+});
 async function writeOperation(
   db,
   { previous = null, patch = {}, eventPatch = {}, withAudit = true } = {},

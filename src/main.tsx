@@ -55,8 +55,13 @@ import {
   type Session,
 } from "./domain";
 import "./styles.css";
+import { DirectoryPage, ComparisonPage } from "./DirectoryPages";
+import { emptyDirectory } from "./directory";
 
 type Page =
+  | "banks"
+  | "managers"
+  | "comparison"
   | "operations"
   | "tasks"
   | "dashboard"
@@ -68,6 +73,9 @@ const navigation = [
   { id: "tasks", label: "Próximas ações", icon: CheckCheck },
   { id: "dashboard", label: "Visão geral", icon: BarChart3 },
   { id: "history", label: "Atividades", icon: History },
+  { id: "banks", label: "Bancos e instituições", icon: Building2 },
+  { id: "managers", label: "Gerentes", icon: Users },
+  { id: "comparison", label: "Base recebida", icon: FileText },
 ] as const;
 const stageClass = (stage: string) =>
   `stage stage-${stages.indexOf(stage as any)}`;
@@ -347,8 +355,10 @@ function App() {
               <span className="banner-dot" /> AMBIENTE DE TESTE
             </span>
             <p>
-              Dados fictícios · alterações salvas nesta prévia · produção
-              preservada
+              {["banks", "managers", "comparison"].includes(page)
+                ? "Cadastros e arquivo recebido · salvos neste computador"
+                : "Carteira de demonstração · exemplos fictícios"}{" "}
+              · produção preservada
             </p>
             <button onClick={() => navigate("settings")}>
               Conectar Firebase <ArrowUpRight size={13} />
@@ -819,6 +829,23 @@ function App() {
               </div>
             </>
           )}
+          {(page === "banks" || page === "managers") && (
+            <DirectoryPage
+              key={page}
+              kind={page === "banks" ? "bank" : "manager"}
+              directory={state.directory ?? emptyDirectory}
+              repo={repo}
+              canEdit={canEdit}
+              notify={setNotice}
+            />
+          )}
+          {page === "comparison" && (
+            <ComparisonPage
+              directory={state.directory ?? emptyDirectory}
+              repo={repo}
+              notify={setNotice}
+            />
+          )}
           {page === "history" && (
             <>
               <PageTitle
@@ -967,7 +994,7 @@ function App() {
             <span>
               LR CAPITAL <i /> Gestão de operações
             </span>
-            <span>Nova versão · 0.1</span>
+            <span>Nova versão · 0.2</span>
           </footer>
         </main>
       </div>

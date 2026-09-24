@@ -17,6 +17,10 @@ A configuração Firebase, quando presente, tem prioridade também durante o des
 
 ## O que funciona nesta entrega
 
+- Bancos e instituições: nome, tipo, cor, endereço da logo, aceitação de restrição e condições por garantia (taxa, prazo e LTV).
+- Gerentes: vínculo com instituição, faixa de faturamento, e-mail, WhatsApp, cidade/UF, alcance nacional, por estados, cidade ou raio.
+- Busca, filtros, ordenação numérica de faturamento, arquivamento reversível e histórico dos campos alterados nos cadastros.
+- Base recebida: importação local idempotente do JSON do pipeline, com consulta paginada de todas as tabelas originais. Dados reais permanecem no banco local e não entram neste repositório.
 - Carteira com busca, filtros, etapas, responsáveis e próximos passos.
 - Cadastro e edição de operações; valores solicitados e aprovados separados, em centavos.
 - Agenda de retornos, indicadores e histórico de alterações.
@@ -29,7 +33,11 @@ A configuração Firebase, quando presente, tem prioridade também durante o des
 
 ## Limites atuais
 
-É uma base funcional para evolução, ainda sem equivalência completa com o sistema anterior. Não há importação automática da carteira antiga, anexos, Gmail, envio automático de mensagens, simulações bancárias, gestão de garantias ou portal externo. O faturamento existe no modelo, mas ainda não tem editor na tela.
+É uma base funcional para evolução, ainda sem equivalência completa com o sistema anterior. A importação preserva a carteira antiga para consulta e deriva cadastros de bancos/gerentes dos vínculos, sem transformar as operações antigas nos novos fluxos. Não há migração para o Firebase real, anexos, Gmail, envio automático de mensagens, simulações bancárias, gestão de garantias de clientes ou portal externo. O faturamento da operação existe no modelo, mas ainda não tem editor na tela.
+
+O JSON do pipeline não substitui a exportação das bases completas de bancos e gerentes. Critérios, contatos e taxas ausentes não recebem valores presumidos. A aplicação não interpreta textos dos arquivos como comandos. E-mails de exemplo exibidos como placeholders não devem ser cadastrados como contatos reais. Logs dos novos cadastros registram autor, momento, versão e nomes dos campos alterados; não são um backup com restauração de versões.
+
+Na prévia, use **Base recebida → Importar JSON** para conferir os totais e confirmar a importação. Arquivos de até 8 MB ficam somente no SQLite local, fora da pasta pública. A importação em lote ainda não está disponível no Firebase; as telas de bancos e gerentes possuem gravação individual autenticada preparada para esse ambiente.
 
 O assistente não faz chamadas à OpenAI nem mantém uma conversa automática dentro do CRM. O usuário escolhe o contexto que levará à conversa. Para uma integração automática será necessário um serviço autenticado no servidor, chave protegida, limite de consumo e registro de ações; nunca uma chave no navegador.
 

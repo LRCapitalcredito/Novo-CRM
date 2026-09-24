@@ -46,6 +46,59 @@ service cloud.firestore {
         allow update: if editor() && validOperation(request.resource.data,id) && request.resource.data.version==resource.data.version+1 && request.resource.data.createdAt==resource.data.createdAt && hasAudit(request.resource.data,id);
         allow delete: if false;
       }
+      function optionalNumber(v,max) { return v==null || (v is number && v>=0 && v<=max); }
+      function warranty(m,k) { return !(k in m) || (m[k] is map && m[k].keys().hasAll(['rate','termMonths','ltvPercent']) && m[k].keys().hasOnly(['rate','termMonths','ltvPercent']) && text(m[k].rate,80) && (m[k].termMonths==null || (m[k].termMonths is int && m[k].termMonths>=0 && m[k].termMonths<=600)) && optionalNumber(m[k].ltvPercent,100)); }
+      function guarantees(m) {
+        return m is map && m.keys().hasOnly(['Imóveis (Geral)','Imóvel Urbano','Imóvel Rural','Imóvel Operacional','Veículos Leves','Veículos Pesados','Recebíveis','Contratos','Aplicação Financeira','Aval / Fiador','Estoque','FGI / Limpa','Safra','Câmbio','Universal'])
+        && warranty(m,'Imóveis (Geral)') && warranty(m,'Imóvel Urbano') && warranty(m,'Imóvel Rural') && warranty(m,'Imóvel Operacional') && warranty(m,'Veículos Leves') && warranty(m,'Veículos Pesados') && warranty(m,'Recebíveis') && warranty(m,'Contratos') && warranty(m,'Aplicação Financeira') && warranty(m,'Aval / Fiador') && warranty(m,'Estoque') && warranty(m,'FGI / Limpa') && warranty(m,'Safra') && warranty(m,'Câmbio') && warranty(m,'Universal');
+      }
+      function validDirectory(v,id) {
+        return v.keys().hasAll(['id','kind','name','notes','source','archived','version','createdAt','updatedAt','updatedBy','lastEventId'])
+          && v.id==id && id.matches('^[a-zA-Z0-9_-]{6,100}$') && text(v.name,160) && v.name.size()>0
+          && text(v.notes,12000) && text(v.source,300) && v.archived is bool
+          && v.version is int && v.version>=1 && v.createdAt is timestamp && v.updatedAt==request.time && v.updatedBy==request.auth.uid
+          && text(v.lastEventId,80) && v.lastEventId.size()>0
+          && (v.kind=='bank' ? validBank(v) : (v.kind=='manager' && validManager(v)));
+      }
+      function validBank(v) {
+        return v.keys().hasAll(['type','color','logoUrl','acceptsRestriction','guarantees'])
+          && v.keys().hasOnly(['id','kind','name','notes','source','archived','version','createdAt','updatedAt','updatedBy','lastEventId','type','color','logoUrl','acceptsRestriction','guarantees'])
+          && text(v.type,100) && text(v.color,7) && v.color.matches('^#[0-9a-fA-F]{6}$') && text(v.logoUrl,2000) && (v.logoUrl=='' || v.logoUrl.matches('^https://[^\\s]+$'))
+          && (v.acceptsRestriction==null || v.acceptsRestriction is bool) && guarantees(v.guarantees);
+      }
+      function validManager(v) {
+        return v.keys().hasAll(['bankId','minRevenueCents','maxRevenueCents','email','phone','city','state','serviceScope','radiusKm','servedStates'])
+          && v.keys().hasOnly(['id','kind','name','notes','source','archived','version','createdAt','updatedAt','updatedBy','lastEventId','bankId','minRevenueCents','maxRevenueCents','email','phone','city','state','serviceScope','radiusKm','servedStates'])
+          && text(v.bankId,100) && v.bankId.matches('^[a-zA-Z0-9_-]{6,100}$') && getAfter(/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/directory/$(v.bankId)).data.kind=='bank'
+          && money(v.minRevenueCents) && money(v.maxRevenueCents) && (v.minRevenueCents==null || v.maxRevenueCents==null || v.minRevenueCents<=v.maxRevenueCents)
+          && text(v.email,180) && text(v.phone,40) && text(v.city,120) && text(v.state,2)
+          && v.state in ['','AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
+          && v.serviceScope in ['','city','radius','states','national'] && optionalNumber(v.radiusKm,20000)
+          && v.servedStates is list && v.servedStates.size()<=27 && v.servedStates.hasOnly(['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'])
+          && (v.serviceScope!='states'||v.servedStates.size()>0) && (v.serviceScope!='radius'||(v.radiusKm>0 && v.city.size()>0 && v.state.size()>0));
+      }
+      function hasDirectoryAudit(v,id) {
+        let e=getAfter(/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/directoryEvents/$(v.lastEventId)).data;
+        return e.entityId==id && e.version==v.version && e.at==request.time && e.actorUid==request.auth.uid;
+      }
+      match /directory/{id} {
+        allow get,list: if active();
+        allow create: if editor() && validDirectory(request.resource.data,id) && request.resource.data.version==1 && request.resource.data.createdAt==request.time && hasDirectoryAudit(request.resource.data,id);
+        allow update: if editor() && validDirectory(request.resource.data,id) && request.resource.data.kind==resource.data.kind && request.resource.data.version==resource.data.version+1 && request.resource.data.createdAt==resource.data.createdAt && hasDirectoryAudit(request.resource.data,id);
+        allow delete: if false;
+      }
+      match /directoryEvents/{eventId} {
+        function validDirectoryEvent(e) {
+          let target=/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/directory/$(e.entityId);
+          let v=getAfter(target).data;
+          let ignore=['id','kind','version','createdAt','updatedAt','updatedBy','lastEventId'].toSet();
+          let changed=exists(target)?v.diff(get(target).data).affectedKeys().difference(ignore):v.keys().toSet().difference(ignore);
+          return v.lastEventId==eventId && e.kind==v.kind && e.name==v.name && e.version==v.version && e.changes is list && e.changes.toSet()==changed;
+        }
+        allow get,list: if active();
+        allow create: if editor() && request.resource.data.keys().hasAll(['entityId','kind','name','actor','actorUid','at','version','changes']) && request.resource.data.keys().hasOnly(['entityId','kind','name','actor','actorUid','at','version','changes']) && request.resource.data.actorUid==request.auth.uid && request.resource.data.actor==member().name && request.resource.data.at==request.time && validDirectoryEvent(request.resource.data);
+        allow update,delete: if false;
+      }
       match /activities/{eventId} {
         allow get,list: if active();
         allow create: if editor()

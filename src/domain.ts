@@ -53,6 +53,7 @@ export interface Activity {
 export interface WorkspaceState {
   operations: Operation[];
   activities: Activity[];
+  directory?: import("./directory").DirectoryState;
 }
 export interface Session {
   uid: string;

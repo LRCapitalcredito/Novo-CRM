@@ -1,5 +1,12 @@
 import type { OperationInput, Session, WorkspaceState } from "./domain";
+import type { DirectoryInput, ImportSummary, LegacyDataset } from "./directory";
 export interface Repository {
+  saveDirectory(
+    record: DirectoryInput,
+    expectedVersion: number | null,
+  ): Promise<void>;
+  importDataset?(data: LegacyDataset, filename: string): Promise<ImportSummary>;
+  readImport?(id: string): Promise<LegacyDataset>;
   mode: "preview" | "firebase";
   session: Session | null;
   authListener(
@@ -37,6 +44,20 @@ export async function createRepository(): Promise<Repository | null> {
   };
   return {
     mode: "preview",
+    async saveDirectory(record, expectedVersion) {
+      await post("/__preview/directory", { record, expectedVersion });
+    },
+    async importDataset(data, filename) {
+      return post("/__preview/imports", { data, filename });
+    },
+    async readImport(id) {
+      const response = await fetch(
+        "/__preview/imports/" + encodeURIComponent(id),
+      );
+      if (!response.ok)
+        throw new Error("Não foi possível consultar o arquivo.");
+      return response.json();
+    },
     session,
     authListener(cb) {
       cb(session);
@@ -61,4 +82,14 @@ export async function createRepository(): Promise<Repository | null> {
       if (!res.ok) throw new Error(data.error);
     },
   };
+}
+async function post(url: string, data: unknown) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || "Falha ao salvar.");
+  return body;
 }

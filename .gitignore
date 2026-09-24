@@ -6,3 +6,6 @@ dist/
 !.env.example
 public/firebase-config.json
 *.log
+*.sqlite*
+.local-data/
+Pipeline_LRCapital_*.json

@@ -11,6 +11,7 @@ import {
   type WorkspaceState,
 } from "../src/domain";
 import { sampleOperations } from "../src/sample";
+import { createDirectoryStore } from "./directoryStore";
 
 export function createPreviewStore(filename: string) {
   if (filename !== ":memory:")
@@ -19,7 +20,9 @@ export function createPreviewStore(filename: string) {
   db.exec(
     "PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS operations (id TEXT PRIMARY KEY, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS activities (id TEXT PRIMARY KEY, data TEXT NOT NULL, at TEXT NOT NULL);",
   );
+  const directory = createDirectoryStore(db);
   return {
+    directory,
     seed() {
       const count = db
         .prepare("SELECT COUNT(*) AS n FROM operations")
@@ -33,6 +36,7 @@ export function createPreviewStore(filename: string) {
     },
     state(): WorkspaceState {
       return {
+        directory: directory.state(),
         operations: db
           .prepare("SELECT data FROM operations ORDER BY id")
           .all()
@@ -101,7 +105,8 @@ async function readBody(req: IncomingMessage) {
   let body = "";
   for await (const chunk of req) {
     body += chunk;
-    if (body.length > 64000) throw new Error("Solicitação muito grande.");
+    if (Buffer.byteLength(body, "utf8") > 8000000)
+      throw new Error("Solicitação muito grande (limite: 8 MB).");
   }
   return JSON.parse(body);
 }
@@ -161,6 +166,30 @@ export function previewPlugin(): Plugin {
           }
           if (req.url === "/state" && req.method === "GET") {
             respond(200, store.state());
+            return;
+          }
+          if (req.url?.startsWith("/imports/") && req.method === "GET") {
+            respond(
+              200,
+              store.directory.readImport(req.url.slice("/imports/".length)),
+            );
+            return;
+          }
+          if (
+            (req.url === "/directory" || req.url === "/imports") &&
+            req.method === "POST"
+          ) {
+            if (req.headers["content-type"] !== "application/json") {
+              respond(415, { error: "Formato inválido." });
+              return;
+            }
+            const body = await readBody(req);
+            const result =
+              req.url === "/directory"
+                ? store.directory.save(body.record, body.expectedVersion)
+                : store.directory.import(body.data, body.filename);
+            respond(200, result);
+            publish();
             return;
           }
           if (req.url === "/operations" && req.method === "POST") {

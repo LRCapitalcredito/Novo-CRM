@@ -101,7 +101,9 @@ Em Authentication → Settings → Authorized domains, confira o domínio de ace
 - Desativar uma conta de teste e confirmar a perda de acesso.
 - Conferir no Firebase os erros e o consumo de leituras/gravações.
 
-Esta entrega ainda não importa a carteira antiga. A migração deve preservar origem, IDs, valores solicitados/aprovados, responsáveis e relacionamentos, com relatório de conferência. Não copie dados reais para arquivos do GitHub. A exportação da tela é limitada ao conjunto carregado e não substitui backup do banco.
+A versão 0.2 importa o arquivo do pipeline para consulta e deriva cadastros de bancos/gerentes **somente na prévia local**. A migração para o Firebase continua pendente e deve preservar origem, IDs, valores solicitados/aprovados, responsáveis e relacionamentos, com relatório de conferência. Não copie dados reais para arquivos do GitHub. A exportação da tela é limitada ao conjunto carregado e não substitui backup do banco.
+
+As regras da versão 0.2 incluem `directory` e `directoryEvents`, necessários para as telas de bancos/gerentes. Cadastros individuais são gravados com histórico e versão, e o servidor recusa gerente vinculado a uma instituição inexistente. Antes de atualizar um ambiente Firebase, homologar esse conjunto de regras conforme a seção 5. O arquivo bruto importado para comparação não é publicado nem sincronizado com o Firebase nesta versão.
 
 ## 8. Atualizações depois da primeira publicação
 

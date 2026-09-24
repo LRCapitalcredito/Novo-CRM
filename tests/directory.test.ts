@@ -8,6 +8,7 @@ import {
   validateDataset,
   legacyMoney,
   whatsappUrl,
+  directoryChanges,
 } from "../src/directory";
 const dataset = {
   clientes: [{ ID_CLIENTE: "c-1" }],
@@ -133,4 +134,16 @@ test("condições desconhecidas não viram padrões e limites são verificados",
   assert.equal(whatsappUrl("51999990000"), "https://wa.me/5551999990000");
   assert.equal(whatsappUrl("123"), null);
   assert.throws(() => validateDataset({ senha: "não é arquivo de pipeline" }));
+});
+
+test("histórico compara o conteúdo das garantias sem depender da ordem das chaves", () => {
+  const store = createPreviewStore(":memory:");
+  const bank = newBank();
+  assert.ok(bank.kind === "bank");
+  const input = { ...bank, name: "Banco fictício", guarantees: { Universal: { rate: "1,5%", termMonths: 60, ltvPercent: 70 } } };
+  const saved = store.directory.save(input, null);
+  const reordered = { ...input, guarantees: { Universal: { ltvPercent: 70, rate: "1,5%", termMonths: 60 } } };
+  assert.deepEqual(directoryChanges(saved, reordered), []);
+  assert.deepEqual(directoryChanges(saved, { ...reordered, guarantees: { Universal: { rate: "1,6%", termMonths: 60, ltvPercent: 70 } } }), ["guarantees"]);
+  store.close();
 });

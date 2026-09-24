@@ -180,6 +180,28 @@ test("garantias e faixa de faturamento têm validação no servidor", async () =
     ].map((k) => [k, { rate: "Referência", termMonths: 60, ltvPercent: 70 }]),
   );
   await assertSucceeds(writeDirectory(db, { ...bankInput, guarantees }));
+  let previous = (await getDoc(doc(db, `${root}/directory/bank-test`))).data();
+  await assertSucceeds(writeDirectory(db, { ...bankInput, guarantees, notes: "Atualização com todas as garantias" }, previous));
+  previous = (await getDoc(doc(db, `${root}/directory/bank-test`))).data();
+  for (const kind of Object.keys(guarantees)) {
+    await assertFails(writeDirectory(db, {
+      ...bankInput,
+      guarantees: { ...guarantees, [kind]: { rate: "", termMonths: 60, ltvPercent: 101 } },
+    }, previous));
+  }
+  for (const invalid of [
+    { rate: "", termMonths: 2.5, ltvPercent: null },
+    { rate: "", termMonths: -1, ltvPercent: null },
+    { rate: "", termMonths: 601, ltvPercent: null },
+    { rate: "", termMonths: null, ltvPercent: "70" },
+    { rate: 15, termMonths: null, ltvPercent: null },
+    { rate: "x".repeat(81), termMonths: null, ltvPercent: null },
+    { rate: "", termMonths: null },
+  ]) {
+    await assertFails(writeDirectory(db, { ...bankInput, guarantees: { Universal: invalid } }, previous));
+  }
+  const unknown = Object.fromEntries(Object.keys(guarantees).map(k => [k, { rate: "", termMonths: null, ltvPercent: null }]));
+  await assertSucceeds(writeDirectory(db, { ...bankInput, guarantees: unknown }, previous));
   await assertFails(
     writeDirectory(db, {
       ...managerInput,

@@ -50,7 +50,7 @@ service cloud.firestore {
       function warrantyValue(g) {
         let term=g.termMonths;
         let ltv=g.ltvPercent;
-        return g.size()==3 && g.keys().hasOnly(['rate','termMonths','ltvPercent'])
+        return g.keys().hasOnly(['rate','termMonths','ltvPercent'])
           && g.rate.matches('^[\\s\\S]{0,80}$')
           && (term==null || (term is int && term>=0 && term<=600))
           && (ltv==null || (ltv is number && ltv>=0 && ltv<=100));
@@ -58,7 +58,10 @@ service cloud.firestore {
       function warranty(m,k) { return !(k in m) || warrantyValue(m[k]); }
       function guarantees(m) {
         return m is map && m.keys().hasOnly(['Imóveis (Geral)','Imóvel Urbano','Imóvel Rural','Imóvel Operacional','Veículos Leves','Veículos Pesados','Recebíveis','Contratos','Aplicação Financeira','Aval / Fiador','Estoque','FGI / Limpa','Safra','Câmbio','Universal'])
-        && warranty(m,'Imóveis (Geral)') && warranty(m,'Imóvel Urbano') && warranty(m,'Imóvel Rural') && warranty(m,'Imóvel Operacional') && warranty(m,'Veículos Leves') && warranty(m,'Veículos Pesados') && warranty(m,'Recebíveis') && warranty(m,'Contratos') && warranty(m,'Aplicação Financeira') && warranty(m,'Aval / Fiador') && warranty(m,'Estoque') && warranty(m,'FGI / Limpa') && warranty(m,'Safra') && warranty(m,'Câmbio') && warranty(m,'Universal');
+        && warranty(m,'Imóveis (Geral)') && warranty(m,'Imóvel Urbano') && warranty(m,'Imóvel Rural') && warranty(m,'Imóvel Operacional') && warranty(m,'Veículos Leves') && warranty(m,'Veículos Pesados') && warranty(m,'Recebíveis');
+      }
+      function remainingGuarantees(m) {
+        return warranty(m,'Contratos') && warranty(m,'Aplicação Financeira') && warranty(m,'Aval / Fiador') && warranty(m,'Estoque') && warranty(m,'FGI / Limpa') && warranty(m,'Safra') && warranty(m,'Câmbio') && warranty(m,'Universal');
       }
       function validDirectory(v,id) {
         return v.keys().hasAll(['id','kind','name','notes','source','archived','version','createdAt','updatedAt','updatedBy','lastEventId'])
@@ -101,7 +104,11 @@ service cloud.firestore {
           let v=getAfter(target).data;
           let ignore=['id','kind','version','createdAt','updatedAt','updatedBy','lastEventId'].toSet();
           let changed=exists(target)?v.diff(get(target).data).affectedKeys().difference(ignore):v.keys().toSet().difference(ignore);
-          return v.lastEventId==eventId && e.kind==v.kind && e.name==v.name && e.version==v.version && e.changes is list && e.changes.toSet()==changed;
+          // Both documents must be written atomically. Split guarantee checks across
+          // their rules to stay within Firestore's expression limit per write.
+          // The directory rule requires this new event, and an event cannot be reused.
+          return v.lastEventId==eventId && e.kind==v.kind && e.name==v.name && e.version==v.version && e.changes is list && e.changes.toSet()==changed
+            && (v.kind!='bank' || remainingGuarantees(v.guarantees));
         }
         allow get,list: if active();
         allow create: if editor() && request.resource.data.keys().hasAll(['entityId','kind','name','actor','actorUid','at','version','changes']) && request.resource.data.keys().hasOnly(['entityId','kind','name','actor','actorUid','at','version','changes']) && request.resource.data.actorUid==request.auth.uid && request.resource.data.actor==member().name && request.resource.data.at==request.time && validDirectoryEvent(request.resource.data);

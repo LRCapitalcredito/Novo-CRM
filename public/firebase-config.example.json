@@ -1,0 +1,7 @@
+{
+  "apiKey": "CHAVE_PUBLICA_DA_CONFIGURACAO_WEB_FIREBASE",
+  "authDomain": "SEU_PROJETO.firebaseapp.com",
+  "projectId": "SEU_PROJETO",
+  "appId": "APP_ID_DA_CONFIGURACAO_WEB",
+  "workspaceId": "lr-capital"
+}

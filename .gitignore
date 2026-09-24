@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.firebase/
+.preview/
+.env*
+!.env.example
+public/firebase-config.json
+*.log

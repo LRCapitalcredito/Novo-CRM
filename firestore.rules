@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /lr_v2_workspaces/{workspace} {
+      function signedIn() { return request.auth != null; }
+      function member() { return get(/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/members/$(request.auth.uid)).data; }
+      function active() { return signedIn() && member().active == true && member().role in ['admin','editor','reader']; }
+      function editor() { return active() && member().role in ['admin','editor']; }
+      function admin() { return active() && member().role == 'admin'; }
+      function text(v,max) { return v is string && v.size() <= max; }
+      function money(v) { return v == null || (v is int && v >= 0 && v <= 1000000000000000); }
+      function summary(v) { return {'company':v.company,'stage':v.stage,'requestedCents':v.requestedCents,'approvedCents':v.approvedCents,'nextAction':v.nextAction,'dueDate':v.dueDate,'version':v.version}; }
+      function validOperation(v,id) {
+        return v.keys().hasAll(['id','company','cnpj','contact','email','phone','product','stage','owner','requestedCents','approvedCents','revenueCents','nextAction','dueDate','institution','notes','version','createdAt','updatedAt','updatedBy','lastEventId'])
+          && v.keys().hasOnly(['id','company','cnpj','contact','email','phone','product','stage','owner','requestedCents','approvedCents','revenueCents','nextAction','dueDate','institution','notes','version','createdAt','updatedAt','updatedBy','lastEventId'])
+          && v.id == id && id.matches('^[a-zA-Z0-9_-]{6,80}$')
+          && text(v.company,160) && v.company.size()>0
+          && text(v.owner,100) && v.owner.size()>0
+          && text(v.cnpj,18) && text(v.contact,120) && text(v.email,180) && text(v.phone,40)
+          && v.product in ['Capital de giro','Antecipação de recebíveis','Home equity','Financiamento']
+          && v.stage in ['Novo','Documentação','Análise','Mesa de crédito','Aprovado','Liberado','Retomada']
+          && money(v.requestedCents) && money(v.approvedCents) && money(v.revenueCents)
+          && text(v.nextAction,500) && text(v.dueDate,10) && (v.dueDate == '' || v.dueDate.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'))
+          && text(v.institution,160) && text(v.notes,12000)
+          && v.version is int && v.version>=1
+          && v.createdAt is timestamp && v.updatedAt == request.time && v.updatedBy == request.auth.uid
+          && text(v.lastEventId,80) && v.lastEventId.size()>0;
+      }
+      function hasAudit(v,id) {
+        let event = getAfter(/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/activities/$(v.lastEventId)).data;
+        return event.operationId == id && event.operationVersion == v.version && event.actorUid == request.auth.uid && event.at == request.time;
+      }
+      match /members/{uid} {
+        allow get: if signedIn() && (request.auth.uid == uid || admin());
+        allow list: if admin();
+        allow create, update: if admin()
+          && request.resource.data.keys().hasAll(['name','role','active'])
+          && request.resource.data.keys().hasOnly(['name','role','active'])
+          && text(request.resource.data.name,100) && request.resource.data.name.size()>0
+          && request.resource.data.role in ['admin','editor','reader'] && request.resource.data.active is bool;
+        allow delete: if false;
+      }
+      match /operations/{id} {
+        allow get,list: if active();
+        allow create: if editor() && validOperation(request.resource.data,id) && request.resource.data.version==1 && request.resource.data.createdAt==request.time && hasAudit(request.resource.data,id);
+        allow update: if editor() && validOperation(request.resource.data,id) && request.resource.data.version==resource.data.version+1 && request.resource.data.createdAt==resource.data.createdAt && hasAudit(request.resource.data,id);
+        allow delete: if false;
+      }
+      match /activities/{eventId} {
+        allow get,list: if active();
+        allow create: if editor()
+          && request.resource.data.keys().hasAll(['operationId','company','actor','actorUid','at','action','before','after','operationVersion'])
+          && request.resource.data.keys().hasOnly(['operationId','company','actor','actorUid','at','action','before','after','operationVersion'])
+          && request.resource.data.actorUid==request.auth.uid && request.resource.data.actor==member().name
+          && request.resource.data.at==request.time
+          && validEvent(request.resource.data,eventId);
+        function validEvent(e,eventId) {
+          let opPath=/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/operations/$(e.operationId);
+          let op=getAfter(opPath).data;
+          return op.lastEventId==eventId && op.version==e.operationVersion
+            && e.company==op.company && e.after==summary(op)
+            && (exists(opPath) ? (e.before==summary(get(opPath).data) && e.action=='Operação atualizada') : (e.before==null && e.action=='Operação criada'));
+        }
+        allow update,delete: if false;
+      }
+    }
+  }
+}

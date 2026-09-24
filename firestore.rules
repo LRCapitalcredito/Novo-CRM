@@ -47,7 +47,13 @@ service cloud.firestore {
         allow delete: if false;
       }
       function optionalNumber(v,max) { return v==null || (v is number && v>=0 && v<=max); }
-      function warranty(m,k) { return !(k in m) || (m[k] is map && m[k].keys().hasAll(['rate','termMonths','ltvPercent']) && m[k].keys().hasOnly(['rate','termMonths','ltvPercent']) && text(m[k].rate,80) && (m[k].termMonths==null || (m[k].termMonths is int && m[k].termMonths>=0 && m[k].termMonths<=600)) && optionalNumber(m[k].ltvPercent,100)); }
+      function warrantyValue(g) {
+        return g is map && g.size()==3 && g.keys().hasOnly(['rate','termMonths','ltvPercent'])
+          && g.rate is string && g.rate.size()<=80
+          && (g.termMonths==null || (g.termMonths is int && g.termMonths>=0 && g.termMonths<=600))
+          && (g.ltvPercent==null || (g.ltvPercent is number && g.ltvPercent>=0 && g.ltvPercent<=100));
+      }
+      function warranty(m,k) { return !(k in m) || warrantyValue(m[k]); }
       function guarantees(m) {
         return m is map && m.keys().hasOnly(['Imóveis (Geral)','Imóvel Urbano','Imóvel Rural','Imóvel Operacional','Veículos Leves','Veículos Pesados','Recebíveis','Contratos','Aplicação Financeira','Aval / Fiador','Estoque','FGI / Limpa','Safra','Câmbio','Universal'])
         && warranty(m,'Imóveis (Geral)') && warranty(m,'Imóvel Urbano') && warranty(m,'Imóvel Rural') && warranty(m,'Imóvel Operacional') && warranty(m,'Veículos Leves') && warranty(m,'Veículos Pesados') && warranty(m,'Recebíveis') && warranty(m,'Contratos') && warranty(m,'Aplicação Financeira') && warranty(m,'Aval / Fiador') && warranty(m,'Estoque') && warranty(m,'FGI / Limpa') && warranty(m,'Safra') && warranty(m,'Câmbio') && warranty(m,'Universal');
@@ -83,8 +89,8 @@ service cloud.firestore {
       }
       match /directory/{id} {
         allow get,list: if active();
-        allow create: if editor() && validDirectory(request.resource.data,id) && request.resource.data.version==1 && request.resource.data.createdAt==request.time && hasDirectoryAudit(request.resource.data,id);
-        allow update: if editor() && validDirectory(request.resource.data,id) && request.resource.data.kind==resource.data.kind && request.resource.data.version==resource.data.version+1 && request.resource.data.createdAt==resource.data.createdAt && hasDirectoryAudit(request.resource.data,id);
+        allow create: if request.resource.data.version==1 && request.resource.data.createdAt==request.time && editor() && validDirectory(request.resource.data,id) && hasDirectoryAudit(request.resource.data,id);
+        allow update: if request.resource.data.version==resource.data.version+1 && request.resource.data.kind==resource.data.kind && request.resource.data.createdAt==resource.data.createdAt && editor() && validDirectory(request.resource.data,id) && hasDirectoryAudit(request.resource.data,id);
         allow delete: if false;
       }
       match /directoryEvents/{eventId} {

@@ -1,0 +1,39 @@
+import { type Operation, type WorkspaceState, today, validDate } from "./domain";
+import { isInactive, type WorkspaceRecord } from "./records";
+
+export const normalizeSearch = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+export const isWorking = (op: Operation) => !isInactive(op.stage) && !["Liberado", "Crédito na Conta"].includes(op.stage);
+export type Attention = "all" | "late" | "today" | "unscheduled";
+export function portfolioIndex(state: WorkspaceState, date = today()) {
+  const placements = new Map<string, WorkspaceRecord[]>();
+  for (const record of state.records ?? []) {
+    if (record.kind !== "placement") continue;
+    const current = placements.get(record.operationId) ?? [];
+    current.push(record);
+    placements.set(record.operationId, current);
+  }
+  return state.operations.map((operation) => {
+    const links = placements.get(operation.id) ?? [];
+    // Datas de atualização não representam compromissos. Somente prazos explícitos.
+    const dates = isWorking(operation) ? [operation.dueDate, ...links.filter((r) => r.data.active).map((r) => r.data.dueDate)].filter((d): d is string => typeof d === "string" && !!d && validDate(d)).sort() : [];
+    return { operation, links, nextDue: dates[0] ?? "", late: dates.some((d) => d < date), dueToday: dates.includes(date), unscheduled: isWorking(operation) && dates.length === 0,
+      search: normalizeSearch([operation.company, operation.cnpj, operation.owner, operation.nextAction, operation.contact, ...links.flatMap((r) => [r.data.institution, r.data.manager])].join(" ")) };
+  });
+}
+export type PortfolioEntry = ReturnType<typeof portfolioIndex>[number];
+export function priorityOrder(a: PortfolioEntry, b: PortfolioEntry) {
+  return Number(isWorking(b.operation)) - Number(isWorking(a.operation)) || Number(b.late) - Number(a.late) || (a.nextDue || "9999").localeCompare(b.nextDue || "9999");
+}
+export function matchesAttention(row: PortfolioEntry, filter: Attention) {
+  return filter === "all" || (filter === "late" && row.late) || (filter === "today" && row.dueToday) || (filter === "unscheduled" && row.unscheduled);
+}
+export function stageTone(stage: string) {
+  if (isInactive(stage)) return "neutral";
+  const normalized = normalizeSearch(stage);
+  if (/aprovado.*negado/.test(normalized)) return "purple";
+  if (/aprovado|liberado|credito na conta/.test(normalized)) return "green";
+  if (/mesa|assinatura|contrato/.test(normalized)) return "gold";
+  if (/analise|diagnostico/.test(normalized)) return "purple";
+  if (/document|triagem/.test(normalized)) return "blue";
+  return "neutral";
+}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -8,11 +8,21 @@ import {
   FileText,
   ClipboardList,
   Settings2,
+  BriefcaseBusiness,
+  Users,
+  Clock3,
+  RotateCcw,
+  ArrowRight,
+  Calculator,
+  ListFilter,
+  Rows3,
+  LayoutList,
 } from "lucide-react";
 import {
   money,
   parseMoney,
   displayDate,
+  today,
   type Operation,
   type WorkspaceState,
 } from "./domain";
@@ -25,12 +35,8 @@ import {
   type WorkspaceRecord,
 } from "./records";
 import type { Repository } from "./repository";
+import { isWorking, matchesAttention, normalizeSearch, portfolioIndex, priorityOrder, stageTone, type Attention } from "./portfolio";
 import "./modules.css";
-const norm = (s: string) =>
-  s
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
 const err = (e: unknown) =>
   e instanceof Error ? e.message : "Não foi possível salvar.";
 export function ClientPortfolio({
@@ -51,6 +57,11 @@ export function ClientPortfolio({
   const [search, setSearch] = useState(""),
     [filter, setFilter] = useState("Todos"),
     [owner, setOwner] = useState("Todos"),
+    [product, setProduct] = useState("Todos"),
+    [attention, setAttention] = useState<Attention>("all"),
+    [sort, setSort] = useState("priority"),
+    [currentPage, setCurrentPage] = useState(1),
+    [compact, setCompact] = useState(() => { try { return localStorage.getItem("lr-portfolio-compact") === "true"; } catch { return false; } }),
     [expanded, setExpanded] = useState<string | null>(null),
     [editing, setEditing] = useState<{
       op: Operation;
@@ -59,27 +70,48 @@ export function ClientPortfolio({
     } | null>(null);
   const records = state.records ?? [],
     placements = records.filter((r) => r.kind === "placement");
-  const rows = state.operations.filter(
-    (o) =>
-      (filter === "Todos" ||
-        (filter === "Em atuação"
-          ? !isInactive(o.stage)
-          : isInactive(o.stage))) &&
-      (owner === "Todos" || o.owner === owner) &&
-      norm(
-        [
-          o.company,
-          o.cnpj,
-          o.owner,
-          o.nextAction,
-          ...placements
-            .filter((r) => r.operationId === o.id)
-            .map((r) => r.data.institution),
-        ].join(" "),
-      ).includes(norm(search)),
-  );
+  const [date, setDate] = useState(today);
+  useEffect(() => { const timer = setInterval(() => setDate(today()), 60000); return () => clearInterval(timer); }, []);
+  const index = useMemo(() => portfolioIndex(state, date), [state, date]);
+  const activeCount = index.filter((r) => isWorking(r.operation)).length;
+  const resumeCount = index.filter((r) => isInactive(r.operation.stage)).length;
+  const lateCount = index.filter((r) => r.late).length;
+  const todayCount = index.filter((r) => r.dueToday).length;
+  const unscheduledCount = index.filter((r) => r.unscheduled).length;
+  const rows = useMemo(() => {
+    const result = index.filter((r) => {
+      const o = r.operation;
+      return (filter === "Todos" || (filter === "Em atuação" ? isWorking(o) : filter === "Para retomada" ? isInactive(o.stage) : !isWorking(o) && !isInactive(o.stage)))
+        && (owner === "Todos" || o.owner === owner) && (product === "Todos" || o.product === product)
+        && matchesAttention(r, attention) && r.search.includes(normalizeSearch(search));
+    });
+    if (sort === "priority") result.sort(priorityOrder);
+    if (sort === "name") result.sort((a, b) => a.operation.company.localeCompare(b.operation.company, "pt-BR"));
+    if (sort === "amount") result.sort((a, b) => (b.operation.requestedCents ?? -1) - (a.operation.requestedCents ?? -1));
+    if (sort === "due") result.sort((a, b) => (a.nextDue || "9999").localeCompare(b.nextDue || "9999"));
+    return result;
+  }, [index, filter, owner, product, attention, search, sort]);
+  useEffect(() => { setCurrentPage(1); }, [search, filter, owner, product, attention, sort]);
+  const pages = Math.max(1, Math.ceil(rows.length / 25)), page = Math.min(currentPage, pages);
+  const displayed = rows.slice((page - 1) * 25, page * 25);
+  const reset = () => { setSearch(""); setOwner("Todos"); setProduct("Todos"); setFilter("Todos"); setAttention("all"); setSort("priority"); };
+  const selectSummary = (nextFilter: string, nextAttention: Attention = "all") => { reset(); setFilter(nextFilter); setAttention(nextAttention); };
+  const filtered = search || owner !== "Todos" || product !== "Todos" || filter !== "Todos" || attention !== "all";
   return (
-    <section className="module-page">
+    <section className={`module-page portfolio-page ${compact ? "compact-portfolio" : ""}`}>
+      <div className="portfolio-overview" aria-label="Resumo da carteira">
+        {[
+          { label: "Clientes na carteira", value: index.length, sub: `${placements.length} vínculos com instituições`, icon: Users, tone: "navy", selected: filter === "Todos" && attention === "all", run: () => selectSummary("Todos") },
+          { label: "Em atuação", value: activeCount, sub: "operações em andamento", icon: BriefcaseBusiness, tone: "green", selected: filter === "Em atuação" && attention === "all", run: () => selectSummary("Em atuação") },
+          { label: "Para retomada", value: resumeCount, sub: "clientes para reaproximar", icon: RotateCcw, tone: "gold", selected: filter === "Para retomada" && attention === "all", run: () => selectSummary("Para retomada") },
+          { label: "Retornos vencidos", value: lateCount, sub: "clientes com prazos pendentes", icon: Clock3, tone: "red", selected: attention === "late", run: () => selectSummary("Todos", "late") },
+        ].map(({ label, value, sub, icon: Icon, tone, selected, run }) => <button key={label} onClick={run} aria-pressed={selected} className={`portfolio-metric ${tone}`}><span>{label}<Icon size={18} /></span><strong>{value}</strong><small>{sub}<ArrowRight size={14} /></small></button>)}
+      </div>
+      <div className="daily-focus">
+        <div className="daily-focus-label"><Clock3 size={17} /><strong>Radar da carteira</strong><span>Cliente e instituições</span></div>
+        <button className={attention === "today" ? "is-active" : ""} onClick={() => selectSummary("Todos", "today")}><b>{todayCount}</b> com retorno hoje <ArrowRight size={13} /></button>
+        <button className={attention === "unscheduled" ? "is-active" : ""} onClick={() => selectSummary("Em atuação", "unscheduled")}><b>{unscheduledCount}</b> sem prazo definido <ArrowRight size={13} /></button>
+      </div>
       <div className="module-heading">
         <div>
           <div className="eyebrow">GESTÃO DE OPERAÇÕES</div>
@@ -128,6 +160,12 @@ export function ClientPortfolio({
           </button>
         </div>
       </div>
+      <div className="portfolio-shortcuts" aria-label="Acesso rápido">
+        <span>ACESSO RÁPIDO</span>
+        <button onClick={() => onModule("contracts", "")}><FileText size={15} /> Emitir contrato</button>
+        <button onClick={() => onModule("simulator", "")}><Calculator size={15} /> Simular crédito</button>
+        <button onClick={() => onModule("diagnosis", "")}><ClipboardList size={15} /> Preparar diagnóstico</button>
+      </div>
       <div className="module-toolbar">
         <label className="search-field">
           <Search size={17} />
@@ -143,7 +181,7 @@ export function ClientPortfolio({
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         >
-          {["Todos", "Em atuação", "Para retomada"].map((s) => (
+          {["Todos", "Em atuação", "Para retomada", "Concluídos"].map((s) => (
             <option key={s}>{s}</option>
           ))}
         </select>
@@ -152,7 +190,7 @@ export function ClientPortfolio({
           value={owner}
           onChange={(e) => setOwner(e.target.value)}
         >
-          <option>Todos</option>
+          <option value="Todos">Todos os responsáveis</option>
           {[...new Set(state.operations.map((o) => o.owner))]
             .sort()
             .map((s) => (
@@ -160,7 +198,16 @@ export function ClientPortfolio({
             ))}
         </select>
       </div>
-      <div className="module-card portfolio">
+      <div className="portfolio-view-tools">
+        <div><ListFilter size={15} /><select aria-label="Produto da carteira" value={product} onChange={(e) => setProduct(e.target.value)}><option value="Todos">Todos os produtos</option>{[...new Set(state.operations.map((o) => o.product))].sort().map((p) => <option key={p}>{p}</option>)}</select>
+          <select aria-label="Filtrar por prazo" value={attention} onChange={(e) => setAttention(e.target.value as Attention)}><option value="all">Todos os prazos</option><option value="late">Retornos vencidos</option><option value="today">Retorno hoje</option><option value="unscheduled">Sem prazo definido</option></select>
+          {filtered && <button onClick={reset}>Limpar filtros</button>}
+        </div>
+        <div><span>{rows.length} clientes</span><select aria-label="Ordenar carteira" value={sort} onChange={(e) => setSort(e.target.value)}><option value="priority">Prioridade da carteira</option><option value="original">Ordem da base</option><option value="name">Nome A–Z</option><option value="amount">Maior demanda</option><option value="due">Próximo retorno</option></select>
+          <button aria-pressed={compact} aria-label={compact ? "Usar linhas confortáveis" : "Usar linhas compactas"} title={compact ? "Linhas confortáveis" : "Linhas compactas"} onClick={() => { setCompact(!compact); try { localStorage.setItem("lr-portfolio-compact", String(!compact)); } catch { /* Preferência opcional. */ } }}>{compact ? <LayoutList size={17} /> : <Rows3 size={17} />}</button>
+        </div>
+      </div>
+      <div className="module-card portfolio" id="portfolio-list">
         <div className="portfolio-head">
           <span>EMPRESA / CLIENTE</span>
           <span>ETAPA</span>
@@ -168,8 +215,9 @@ export function ClientPortfolio({
           <span>PRÓXIMO PASSO</span>
           <span>RESPONSÁVEL</span>
         </div>
-        {rows.map((op) => {
-          const links = placements.filter((r) => r.operationId === op.id),
+        {displayed.map((entry) => {
+          const { operation: op, links } = entry;
+          const
             profile = findRecord(records, "profile", op.id);
           return (
             <React.Fragment key={op.id}>
@@ -194,22 +242,22 @@ export function ClientPortfolio({
                     </small>
                   </span>
                 </span>
-                <span>
+                <span data-label="Etapa">
                   <b
-                    className={"pill " + (isInactive(op.stage) ? "muted" : "")}
+                    className={`pill status-${stageTone(op.stage)}`}
                   >
                     {op.stage}
                   </b>
                 </span>
-                <span>
+                <span data-label="Demanda">
                   {money(op.requestedCents)}
                   <small>Faturamento: {money(op.revenueCents)}</small>
                 </span>
-                <span className="next-action" title={op.nextAction}>
+                <span className="next-action" data-label="Próximo passo" title={op.nextAction}>
                   {op.nextAction || "Próximo passo a definir"}
-                  <small>{displayDate(op.dueDate)}</small>
+                  <small className={entry.late ? "due-overdue" : ""}>{entry.nextDue ? <><Clock3 size={11} /> {displayDate(entry.nextDue)}{entry.late ? " · vencido" : ""}{entry.nextDue !== op.dueDate ? " · instituição" : ""}</> : isWorking(op) ? "Sem prazo definido" : "Sem retorno agendado"}</small>
                 </span>
-                <span>{op.owner}</span>
+                <span className="portfolio-owner" data-label="Responsável"><i>{op.owner?.slice(0, 1) || "—"}</i>{op.owner}</span>
               </button>
               {expanded === op.id && (
                 <div className="client-expanded">
@@ -258,8 +306,12 @@ export function ClientPortfolio({
           );
         })}
         {!rows.length && (
-          <p className="module-empty">Nenhum cliente encontrado.</p>
+          <div className="module-empty"><Search size={25} /><p>Nenhum cliente nesta seleção.</p><button onClick={reset}>Limpar filtros e ver a carteira</button></div>
         )}
+      </div>
+      <div className="portfolio-pagination" aria-label="Páginas da carteira">
+        <span aria-live="polite">{rows.length ? `${(page - 1) * 25 + 1}–${Math.min(page * 25, rows.length)} de ${rows.length} clientes` : "Nenhum resultado"}</span>
+        <div><button disabled={page <= 1} onClick={() => { setCurrentPage(page - 1); document.getElementById("portfolio-list")?.scrollIntoView({ block: "start" }); }}>Anterior</button><span>Página {page} de {pages}</span><button disabled={page >= pages} onClick={() => { setCurrentPage(page + 1); document.getElementById("portfolio-list")?.scrollIntoView({ block: "start" }); }}>Próxima <ChevronRight size={14} /></button></div>
       </div>
       <p className="module-footnote">
         {rows.length} clientes nesta seleção. Os valores e códigos sem definição
@@ -350,7 +402,7 @@ function InstitutionList({
                     <small>{d.active ? "Em atuação" : "Fora de atuação"}</small>
                   </td>
                   <td>
-                    <span className="pill">
+                    <span className={`pill status-${stageTone(d.status || "")}`}>
                       {/^\d+$/.test(d.status)
                         ? "Código original: " + d.status
                         : d.status || "Não informado"}

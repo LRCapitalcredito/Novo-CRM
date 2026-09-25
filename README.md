@@ -1,6 +1,17 @@
 # LR Capital · Novo CRM
 
-Versão 0.3: carteira, atuação por instituição, bancos, gerentes, contratos, simulador e diagnóstico financeiro. React + TypeScript; prévia com SQLite; adaptador Firebase para o ambiente publicado. Este repositório contém código e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
+Versão 0.4: carteira, atuação por instituição, bancos, gerentes, contratos, simulador e diagnóstico financeiro, com identidade oficial da LR Capital e capa interativa. React + TypeScript; prévia com SQLite; adaptador Firebase para o ambiente publicado. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
+
+### Visualização e rotina
+
+- Logo oficial no acesso, menu, capa e ícone do navegador. Retratos de Ricardo Reis, Lucas Macedo e Giovani Moura de Souza reaproveitados dos materiais do site fornecidos pelo usuário; apresentação conferida em https://www.lrcapitalcredito.com/.
+- Capa recolhível e apresentação institucional com perfis dos sócios, navegação por teclado e respeito à preferência por movimento reduzido.
+- Resumo clicável da carteira, radar de retornos de hoje, vencidos e sem prazo. Considera os prazos explícitos do cliente e dos vínculos ativos. Cada cliente conta uma vez; cadastros concluídos ou para retomada não aparecem como atrasos da operação corrente. Datas de atualização não são prazos.
+- Ordenação inicial por operações ativas e prazo; opções por nome, demanda, retorno e ordem original. Busca também por contato, instituição e gerente dos vínculos.
+- Filtros por responsável, produto, situação e prazo, páginas de 25 clientes e linhas compactas. Produtos ausentes permanecem sem informação; a interface não inventa classificações.
+- A preferência de capa e densidade é individual, salva neste navegador. Dados operacionais continuam no repositório configurado (SQLite local ou Firebase).
+
+Os indicadores representam a base carregada; não indicam integração bancária nem consulta externa em tempo real. Esta atualização não migra ou altera os dados de clientes.
 
 ## Experimentar
 

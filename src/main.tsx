@@ -60,6 +60,8 @@ import { DirectoryPage, ComparisonPage } from "./DirectoryPages";
 import { emptyDirectory } from "./directory";
 
 import { ClientPortfolio } from "./ClientPortfolio";
+import { TeamCover } from "./TeamCover";
+import "./experience.css";
 const DocumentPage = React.lazy(() =>
   import("./DocumentPages").then((m) => ({ default: m.DocumentPage })),
 );
@@ -341,7 +343,7 @@ function App() {
             >
               <Menu size={20} />
             </button>
-            <span>Workspace</span>
+            <span>LR Capital</span>
             <ChevronRight size={13} />
             <strong>
               {page === "assistant"
@@ -395,6 +397,7 @@ function App() {
               {error}
             </div>
           )}
+          {page === "operations" && <TeamCover onRoutine={() => navigate("tasks")} />}
           {page === "operations" && repo && (
             <ClientPortfolio
               state={state}
@@ -449,7 +452,7 @@ function App() {
                     title: "Próximos dias",
                     items: operations
                       .filter(
-                        (o) => o.dueDate > today() && o.stage !== "Liberado",
+                        (o) => o.dueDate > today() && !isInactive(o.stage) && !["Liberado", "Crédito na Conta"].includes(o.stage),
                       )
                       .sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
                     color: "blue",
@@ -737,7 +740,7 @@ function App() {
             <span>
               LR CAPITAL <i /> Gestão de operações
             </span>
-            <span>Nova versão · 0.3</span>
+            <span>Nova versão · 0.4</span>
           </footer>
         </main>
       </div>
@@ -765,13 +768,10 @@ function App() {
 function Brand() {
   return (
     <div className="brand">
-      <span className="brand-mark">
-        LR
-        <span />
-      </span>
+      <span className="brand-official"><img src="/brand/lr-capital-oficial.png" alt="LR Capital" width="738" height="640" /></span>
       <div>
-        <strong>CAPITAL</strong>
-        <small>CONSULTORIA & CRÉDITO</small>
+        <strong>LR CAPITAL</strong>
+        <small>GESTÃO DE OPERAÇÕES</small>
       </div>
     </div>
   );

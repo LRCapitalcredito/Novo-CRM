@@ -140,10 +140,25 @@ test("histórico compara o conteúdo das garantias sem depender da ordem das cha
   const store = createPreviewStore(":memory:");
   const bank = newBank();
   assert.ok(bank.kind === "bank");
-  const input = { ...bank, name: "Banco fictício", guarantees: { Universal: { rate: "1,5%", termMonths: 60, ltvPercent: 70 } } };
+  const input = {
+    ...bank,
+    name: "Banco fictício",
+    guarantees: { Universal: { rate: "1,5%", termMonths: 60, ltvPercent: 70 } },
+  };
   const saved = store.directory.save(input, null);
-  const reordered = { ...input, guarantees: { Universal: { ltvPercent: 70, rate: "1,5%", termMonths: 60 } } };
+  const reordered = {
+    ...input,
+    guarantees: { Universal: { ltvPercent: 70, rate: "1,5%", termMonths: 60 } },
+  };
   assert.deepEqual(directoryChanges(saved, reordered), []);
-  assert.deepEqual(directoryChanges(saved, { ...reordered, guarantees: { Universal: { rate: "1,6%", termMonths: 60, ltvPercent: 70 } } }), ["guarantees"]);
+  assert.deepEqual(
+    directoryChanges(saved, {
+      ...reordered,
+      guarantees: {
+        Universal: { rate: "1,6%", termMonths: 60, ltvPercent: 70 },
+      },
+    }),
+    ["guarantees"],
+  );
   store.close();
 });

@@ -1,6 +1,10 @@
 import type { OperationInput, Session, WorkspaceState } from "./domain";
 import type { DirectoryInput, ImportSummary, LegacyDataset } from "./directory";
 export interface Repository {
+  saveRecord(
+    record: import("./records").RecordInput,
+    expectedVersion: number | null,
+  ): Promise<void>;
   saveDirectory(
     record: DirectoryInput,
     expectedVersion: number | null,
@@ -44,6 +48,9 @@ export async function createRepository(): Promise<Repository | null> {
   };
   return {
     mode: "preview",
+    async saveRecord(record, expectedVersion) {
+      await post("/__preview/records", { record, expectedVersion });
+    },
     async saveDirectory(record, expectedVersion) {
       await post("/__preview/directory", { record, expectedVersion });
     },

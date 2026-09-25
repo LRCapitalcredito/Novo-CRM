@@ -12,6 +12,9 @@ import {
 } from "../src/domain";
 import { sampleOperations } from "../src/sample";
 import { createDirectoryStore } from "./directoryStore";
+import { createRecordStore } from "./recordStore";
+import { extractDiagnosis } from "./diagnosisAi";
+import { migratePipeline } from "./migratePipeline";
 
 export function createPreviewStore(filename: string) {
   if (filename !== ":memory:")
@@ -21,8 +24,16 @@ export function createPreviewStore(filename: string) {
     "PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS operations (id TEXT PRIMARY KEY, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS activities (id TEXT PRIMARY KEY, data TEXT NOT NULL, at TEXT NOT NULL);",
   );
   const directory = createDirectoryStore(db);
+  const records = createRecordStore(db);
   return {
     directory,
+    records,
+    importPipeline(data: unknown, filename: string) {
+      migratePipeline(db, data, true);
+      const summary = directory.import(data, filename);
+      const migrated = migratePipeline(db, data);
+      return { ...summary, migrated };
+    },
     seed() {
       const count = db
         .prepare("SELECT COUNT(*) AS n FROM operations")
@@ -36,6 +47,7 @@ export function createPreviewStore(filename: string) {
     },
     state(): WorkspaceState {
       return {
+        ...records.state(),
         directory: directory.state(),
         operations: db
           .prepare("SELECT data FROM operations ORDER BY id")
@@ -120,7 +132,7 @@ export function previewPlugin(): Plugin {
         process.env.LR_PREVIEW_DB ||
         resolve(process.cwd(), ".preview", "workspace.sqlite");
       const store = createPreviewStore(filename);
-      store.seed();
+      if (process.env.LR_PREVIEW_DEMO === "1") store.seed();
       const subscribers = new Set<ServerResponse>();
       const publish = () => {
         for (const res of subscribers)
@@ -152,6 +164,32 @@ export function previewPlugin(): Plugin {
           res.end(JSON.stringify(data));
         };
         try {
+          if (req.url === "/ai-status" && req.method === "GET") {
+            respond(200, {
+              available:
+                !!process.env.OPENAI_API_KEY && !!process.env.OPENAI_MODEL,
+            });
+            return;
+          }
+          if (req.url === "/diagnosis-extract" && req.method === "POST") {
+            if (req.headers["content-type"] !== "application/json") {
+              respond(415, { error: "Formato inválido." });
+              return;
+            }
+            const body = await readBody(req);
+            respond(200, { items: await extractDiagnosis(body.text) });
+            return;
+          }
+          if (req.url === "/records" && req.method === "POST") {
+            if (req.headers["content-type"] !== "application/json") {
+              respond(415, { error: "Formato inválido." });
+              return;
+            }
+            const body = await readBody(req);
+            respond(200, store.records.save(body.record, body.expectedVersion));
+            publish();
+            return;
+          }
           if (req.url === "/events" && req.method === "GET") {
             res.writeHead(200, {
               "Content-Type": "text/event-stream",
@@ -187,7 +225,7 @@ export function previewPlugin(): Plugin {
             const result =
               req.url === "/directory"
                 ? store.directory.save(body.record, body.expectedVersion)
-                : store.directory.import(body.data, body.filename);
+                : store.importPipeline(body.data, body.filename);
             respond(200, result);
             publish();
             return;

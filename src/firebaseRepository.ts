@@ -18,6 +18,11 @@ import {
 } from "firebase/firestore";
 import type { Repository } from "./repository";
 import {
+  validateRecord,
+  type WorkspaceRecord,
+  type RecordEvent,
+} from "./records";
+import {
   validateDirectory,
   directoryChanges,
   emptyDirectory,
@@ -49,6 +54,76 @@ export function firebaseRepository(config: Config): Repository {
   let membershipUnsub: (() => void) | undefined;
   const repo: Repository = {
     mode: "firebase",
+    async saveRecord(raw, expectedVersion) {
+      if (!auth.currentUser || !repo.session || repo.session.role === "reader")
+        throw new Error("Sem permissão para alterar.");
+      const input = validateRecord(raw),
+        target = doc(db, root, "records", input.id),
+        audit = doc(collection(db, root, "recordEvents")),
+        actor = repo.session;
+      await runTransaction(db, async (tx) => {
+        const current = await tx.get(target),
+          old = current.exists() ? current.data() : null;
+        if ((old?.version ?? null) !== expectedVersion)
+          throw new Error(
+            "O registro mudou em outra sessão. Reabra antes de salvar.",
+          );
+        if (
+          old &&
+          (old.kind !== input.kind || old.operationId !== input.operationId)
+        )
+          throw new Error("Vínculo não pode ser alterado.");
+        if (
+          input.kind !== "template" &&
+          !(
+            await tx.get(doc(db, root, "operations", input.operationId))
+          ).exists()
+        )
+          throw new Error("Operação não encontrada.");
+        if (input.kind === "placement" && input.data.bankId) {
+          const bank = await tx.get(
+            doc(db, root, "directory", input.data.bankId),
+          );
+          if (!bank.exists() || bank.data().kind !== "bank")
+            throw new Error("Instituição não encontrada.");
+          if (input.data.managerId) {
+            const manager = await tx.get(
+              doc(db, root, "directory", input.data.managerId),
+            );
+            if (
+              !manager.exists() ||
+              manager.data().kind !== "manager" ||
+              manager.data().bankId !== input.data.bankId
+            )
+              throw new Error(
+                "O gerente precisa pertencer à instituição vinculada.",
+              );
+          }
+        }
+        const version = (old?.version ?? 0) + 1,
+          contentJson = JSON.stringify(input.data);
+        tx.set(target, {
+          id: input.id,
+          kind: input.kind,
+          operationId: input.operationId,
+          contentJson,
+          version,
+          createdAt: old?.createdAt ?? serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          updatedBy: actor.uid,
+          lastEventId: audit.id,
+        });
+        tx.set(audit, {
+          recordId: input.id,
+          operationId: input.operationId,
+          kind: input.kind,
+          actor: actor.name,
+          actorUid: actor.uid,
+          at: serverTimestamp(),
+          version,
+        });
+      });
+    },
     session: null,
     authListener(callback) {
       const unsub = onAuthStateChanged(auth, (user) => {
@@ -110,11 +185,7 @@ export function firebaseRepository(config: Config): Repository {
           "Falha ao sincronizar. Confira sua conexão e as permissões da equipe.",
         );
       const a = onSnapshot(
-        query(
-          collection(db, root, "operations"),
-          orderBy("updatedAt", "desc"),
-          limit(250),
-        ),
+        query(collection(db, root, "operations"), orderBy("updatedAt", "desc")),
         (snap) => {
           state = {
             ...state,
@@ -195,11 +266,65 @@ export function firebaseRepository(config: Config): Repository {
         },
         failed,
       );
+      const r = onSnapshot(
+        collection(db, root, "records"),
+        (snap) => {
+          try {
+            state = {
+              ...state,
+              records: snap.docs.map((d) => {
+                const v = d.data();
+                const input = validateRecord({
+                  id: d.id,
+                  kind: v.kind,
+                  operationId: v.operationId,
+                  data: JSON.parse(v.contentJson),
+                });
+                return {
+                  ...input,
+                  version: v.version,
+                  createdAt: iso(v.createdAt),
+                  updatedAt: iso(v.updatedAt),
+                } as WorkspaceRecord;
+              }),
+            };
+            next(state);
+          } catch {
+            failed();
+          }
+        },
+        failed,
+      );
+      const re = onSnapshot(
+        query(
+          collection(db, root, "recordEvents"),
+          orderBy("at", "desc"),
+          limit(400),
+        ),
+        (snap) => {
+          state = {
+            ...state,
+            recordEvents: snap.docs.map(
+              (d) =>
+                ({
+                  ...d.data(),
+                  id: d.id,
+                  at: iso(d.data().at),
+                  changes: [],
+                }) as unknown as RecordEvent,
+            ),
+          };
+          next(state);
+        },
+        failed,
+      );
       return () => {
         a();
         b();
         c();
         d();
+        r();
+        re();
       };
     },
     async saveDirectory(raw, expectedVersion) {

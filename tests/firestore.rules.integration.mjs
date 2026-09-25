@@ -181,13 +181,28 @@ test("garantias e faixa de faturamento têm validação no servidor", async () =
   );
   await assertSucceeds(writeDirectory(db, { ...bankInput, guarantees }));
   let previous = (await getDoc(doc(db, `${root}/directory/bank-test`))).data();
-  await assertSucceeds(writeDirectory(db, { ...bankInput, guarantees, notes: "Atualização com todas as garantias" }, previous));
+  await assertSucceeds(
+    writeDirectory(
+      db,
+      { ...bankInput, guarantees, notes: "Atualização com todas as garantias" },
+      previous,
+    ),
+  );
   previous = (await getDoc(doc(db, `${root}/directory/bank-test`))).data();
   for (const kind of Object.keys(guarantees)) {
-    await assertFails(writeDirectory(db, {
-      ...bankInput,
-      guarantees: { ...guarantees, [kind]: { rate: "", termMonths: 60, ltvPercent: 101 } },
-    }, previous));
+    await assertFails(
+      writeDirectory(
+        db,
+        {
+          ...bankInput,
+          guarantees: {
+            ...guarantees,
+            [kind]: { rate: "", termMonths: 60, ltvPercent: 101 },
+          },
+        },
+        previous,
+      ),
+    );
   }
   for (const invalid of [
     { rate: "", termMonths: 2.5, ltvPercent: null },
@@ -198,10 +213,23 @@ test("garantias e faixa de faturamento têm validação no servidor", async () =
     { rate: "x".repeat(81), termMonths: null, ltvPercent: null },
     { rate: "", termMonths: null },
   ]) {
-    await assertFails(writeDirectory(db, { ...bankInput, guarantees: { Universal: invalid } }, previous));
+    await assertFails(
+      writeDirectory(
+        db,
+        { ...bankInput, guarantees: { Universal: invalid } },
+        previous,
+      ),
+    );
   }
-  const unknown = Object.fromEntries(Object.keys(guarantees).map(k => [k, { rate: "", termMonths: null, ltvPercent: null }]));
-  await assertSucceeds(writeDirectory(db, { ...bankInput, guarantees: unknown }, previous));
+  const unknown = Object.fromEntries(
+    Object.keys(guarantees).map((k) => [
+      k,
+      { rate: "", termMonths: null, ltvPercent: null },
+    ]),
+  );
+  await assertSucceeds(
+    writeDirectory(db, { ...bankInput, guarantees: unknown }, previous),
+  );
   await assertFails(
     writeDirectory(db, {
       ...managerInput,
@@ -287,6 +315,119 @@ async function writeOperation(
     });
   await batch.commit();
 }
+async function writeRecord(
+  db,
+  {
+    id = "contract-test",
+    kind = "contract",
+    operationId = "test-operation",
+    contentJson = "{}",
+  } = {},
+  previous = null,
+  options = {},
+) {
+  const version = (previous?.version ?? 0) + 1,
+    eventId = id + "-event-" + version;
+  const value = {
+    id,
+    kind,
+    operationId,
+    contentJson,
+    version,
+    createdAt: previous?.createdAt ?? serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    updatedBy: "editor",
+    lastEventId: eventId,
+  };
+  const batch = writeBatch(db);
+  batch.set(doc(db, `${root}/records/${id}`), value);
+  if (!options.noAudit)
+    batch.set(doc(db, `${root}/recordEvents/${eventId}`), {
+      recordId: id,
+      operationId,
+      kind,
+      version,
+      at: serverTimestamp(),
+      actor: "editor teste",
+      actorUid: "editor",
+      ...options.eventPatch,
+    });
+  return batch.commit();
+}
+test("contratos e diagnósticos exigem vínculo, versão e histórico atômico", async () => {
+  const db = dbFor();
+  await writeOperation(db);
+  await assertSucceeds(writeRecord(db));
+  const old = (await getDoc(doc(db, `${root}/records/contract-test`))).data();
+  await assertSucceeds(
+    writeRecord(db, { contentJson: '{"company":"Revisado"}' }, old),
+  );
+  await assertFails(writeRecord(db, {}, old));
+  await assertFails(
+    writeRecord(db, { id: "no-audit-record" }, null, { noAudit: true }),
+  );
+  await assertFails(
+    writeRecord(db, { id: "wrong-audit-record" }, null, {
+      eventPatch: { version: 2 },
+    }),
+  );
+  await assertFails(
+    writeRecord(db, { id: "orphan-record", operationId: "missing-operation" }),
+  );
+});
+test("leitores consultam documentos, não alteram, e modelos são exclusivos de administradores", async () => {
+  const db = dbFor();
+  await writeOperation(db);
+  await writeRecord(db);
+  await assertSucceeds(
+    getDoc(doc(dbFor("reader"), `${root}/records/contract-test`)),
+  );
+  await assertFails(writeRecord(dbFor("reader"), { id: "reader-record" }));
+  await assertFails(
+    getDoc(
+      doc(
+        env.unauthenticatedContext().firestore(),
+        `${root}/records/contract-test`,
+      ),
+    ),
+  );
+  await assertFails(
+    writeRecord(db, {
+      id: "contract-template",
+      kind: "template",
+      operationId: "",
+    }),
+  );
+  await assertFails(deleteDoc(doc(db, `${root}/records/contract-test`)));
+  await assertFails(
+    updateDoc(doc(db, `${root}/recordEvents/contract-test-event-1`), {
+      actor: "Outro",
+    }),
+  );
+});
+test("documento não pode mudar de cliente ou tipo e recebe limite de conteúdo", async () => {
+  const db = dbFor();
+  await writeOperation(db);
+  await writeRecord(db);
+  const old = (await getDoc(doc(db, `${root}/records/contract-test`))).data();
+  await assertFails(writeRecord(db, { kind: "diagnosis" }, old));
+  await assertFails(writeRecord(db, { operationId: "another-operation" }, old));
+  await assertFails(
+    writeRecord(db, { id: "oversize-record", contentJson: "x".repeat(150001) }),
+  );
+});
+test("etapas originais e faturamento desconhecido são aceitos sem valor inventado", async () => {
+  await assertSucceeds(
+    writeOperation(dbFor(), {
+      patch: {
+        stage: "Captação de Documentos",
+        product: "Não informado",
+        revenueCents: null,
+        nextAction: "Atualização ".repeat(70),
+      },
+    }),
+  );
+});
 test("visitantes e contas sem vínculo não leem operações", async () => {
   await assertFails(
     getDoc(doc(env.unauthenticatedContext().firestore(), path)),

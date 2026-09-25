@@ -1,3 +1,4 @@
+import { isInactive } from "./records";
 export const stages = [
   "Novo",
   "Documentação",
@@ -6,12 +7,40 @@ export const stages = [
   "Aprovado",
   "Liberado",
   "Retomada",
+  "Questionário",
+  "Contrato Assinado",
+  "Pagamento Recebido",
+  "Captação de Documentos",
+  "Triagem e Validação",
+  "Diagnóstico Estratégico",
+  "Análise Bancos",
+  "Mesa de Crédito",
+  "Aprovado / Negado",
+  "Assinatura Banco",
+  "Crédito na Conta",
+  "Parado",
+  "Perdido",
+  "Sem Interesse",
+  "Novo Cliente",
+  "Reunião Agendada",
+  "Reunião Realizada",
+  "Aguardando Assinatura",
+  "Enviar E-mail",
+  "E-mail Enviado",
+  "WhatsApp Enviado",
+  "Apresentar para o gerente",
+  "No Show",
+  "Contrato",
+  "Lead",
+  "sem_restricao",
+  "com_restricao",
 ] as const;
 export const products = [
   "Capital de giro",
   "Antecipação de recebíveis",
   "Home equity",
   "Financiamento",
+  "Não informado",
 ] as const;
 export type Stage = (typeof stages)[number];
 export type Product = (typeof products)[number];
@@ -51,6 +80,8 @@ export interface Activity {
   after: Partial<Operation>;
 }
 export interface WorkspaceState {
+  records?: import("./records").WorkspaceRecord[];
+  recordEvents?: import("./records").RecordEvent[];
   operations: Operation[];
   activities: Activity[];
   directory?: import("./directory").DirectoryState;
@@ -113,7 +144,8 @@ export function isLate(op: Operation) {
   return (
     !!op.dueDate &&
     op.dueDate < today() &&
-    !["Liberado", "Retomada"].includes(op.stage)
+    !isInactive(op.stage) &&
+    !["Liberado", "Crédito na Conta"].includes(op.stage)
   );
 }
 export function validateOperation(value: unknown): OperationInput {
@@ -129,7 +161,7 @@ export function validateOperation(value: unknown): OperationInput {
     email: 180,
     phone: 40,
     owner: 100,
-    nextAction: 500,
+    nextAction: 12000,
     dueDate: 10,
     institution: 160,
     notes: 12000,
@@ -144,9 +176,9 @@ export function validateOperation(value: unknown): OperationInput {
     throw new Error("Empresa e responsável são obrigatórios.");
   if (
     result.cnpj &&
-    !/^\d{14}$/.test((result.cnpj as string).replace(/\D/g, ""))
+    !/^(\d{11}|\d{14})$/.test((result.cnpj as string).replace(/\D/g, ""))
   )
-    throw new Error("CNPJ deve conter 14 dígitos.");
+    throw new Error("Informe CNPJ com 14 dígitos ou CPF com 11 dígitos.");
   if (
     result.email &&
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.email as string)

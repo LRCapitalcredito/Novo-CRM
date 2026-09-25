@@ -1,87 +1,90 @@
 # LR Capital · Novo CRM
 
-Primeira versão funcional do novo ambiente interno da LR Capital, com carteira de operações, próximos passos e histórico. Construída com React, TypeScript e Firebase. Este repositório contém somente código novo e exemplos fictícios; não contém o histórico do sistema anterior, credenciais ou a carteira real.
+Versão 0.3: carteira, atuação por instituição, bancos, gerentes, contratos, simulador e diagnóstico financeiro. React + TypeScript; prévia com SQLite; adaptador Firebase para o ambiente publicado. Este repositório contém código e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
 
-## Experimentar antes de publicar
+## Experimentar
 
-Instale o Node.js 24. Na pasta do projeto:
+Com Node.js 24 instalado:
 
 ```powershell
 npm ci
 npm run dev
 ```
 
-Abra http://127.0.0.1:5174. A prévia inicial usa empresas fictícias, grava alterações em `.preview/workspace.sqlite` e sincroniza as abas deste computador. Esse banco é apenas para avaliação, sem login real, e não é enviado para o site publicado. Para mudar sua localização, defina `LR_PREVIEW_DB` antes de iniciar. Mantenha o servidor restrito a `127.0.0.1`.
+Abra `http://127.0.0.1:5174`. A prévia grava em `.preview/workspace.sqlite` e sincroniza abas deste computador. Para outro arquivo, defina `LR_PREVIEW_DB` antes de iniciar. Mantenha o servidor em `127.0.0.1`: ele não tem autenticação e não deve ser exposto na rede. A configuração Firebase, quando presente, tem prioridade; confira o aviso de ambiente antes de editar.
 
-A configuração Firebase, quando presente, tem prioridade também durante o desenvolvimento. Confira o aviso de ambiente antes de editar dados.
+Uma instalação nova começa vazia. **Base recebida → Importar JSON** valida a exportação do pipeline, preserva as tabelas originais e cria clientes, operações, perfis, instituições e gerentes. Reimportações não sobrescrevem revisões. Demonstrações conhecidas são removidas após backup no banco. Para testes com exemplos, existe a opção explícita `LR_PREVIEW_DEMO=1`.
 
-## O que funciona nesta entrega
+## Funcionalidades
 
-- Bancos e instituições: nome, tipo, cor, endereço da logo, aceitação de restrição e condições por garantia (taxa, prazo e LTV).
-- Gerentes: vínculo com instituição, faixa de faturamento, e-mail, WhatsApp, cidade/UF, alcance nacional, por estados, cidade ou raio.
-- Busca, filtros, ordenação numérica de faturamento, arquivamento reversível e histórico dos campos alterados nos cadastros.
-- Base recebida: importação local idempotente do JSON do pipeline, com consulta paginada de todas as tabelas originais. Dados reais permanecem no banco local e não entram neste repositório.
-- Carteira com busca, filtros, etapas, responsáveis e próximos passos.
-- Cadastro e edição de operações; valores solicitados e aprovados separados, em centavos.
-- Agenda de retornos, indicadores e histórico de alterações.
-- Controle de versão que recusa sobrescritas concorrentes.
-- Exportação JSON dos registros carregados, com indicação da versão do formato.
-- Adaptador Firebase Authentication + Firestore para login e sincronização entre usuários após configuração.
-- Regras de acesso por equipe: administrador, editor e leitor. Operação e histórico são gravados juntos.
-- Assistente em modo manual: copiar contexto para uma conversa no ChatGPT/Codex e revisar uma proposta JSON antes de aplicá-la.
-- Verificação automática de compilação, valores, persistência e regras de acesso a cada atualização no GitHub.
+- Carteira com busca, filtros de atuação/retomada, edição de contatos, valores e próximos passos.
+- Linha expansível com instituições de cada operação, gerente, status, valores, pendências e prazo. Subitens podem ser adicionados ou editados independentemente.
+- Bancos: tipo, logo, aceitação de restrição e taxas/prazos/LTV por garantia. Gerentes: instituição, faturamento, contatos, cidade/UF e alcance.
+- Contrato por cliente com identificação, representante, grupo, remuneração, instituições autorizadas e vigência da consulta. Cláusulas fixas, parâmetros editáveis, uma assinatura final e autorização integrada. Dados essenciais incompletos geram **minuta**.
+- Administradores podem exportar/importar o modelo privado JSON, revisar e aplicar. O modelo anexado pelo usuário foi carregado somente na base local.
+- Simulador PRICE/SAC, carência, IOF parametrizado, TAC, prestamista inicial/mensal e outras despesas. Custos financiados ou descontados da liberação; cronograma, saldo final, CET estimado, CSV, PDF e cenários salvos.
+- Diagnóstico de 11 páginas em paisagem baseado nas seções do modelo recebido. Preenchimento manual, texto estruturado, indicadores derivados e faturamentos mensais. Ausências ficam como desconhecidas. Não aprova crédito nem classifica solvência automaticamente.
+- Leitor PDF interno com navegação e texto acessível. Documentos são carregados sob demanda.
+- Persistência, histórico e controle de versão também para documentos/subitens; edições concorrentes desatualizadas são recusadas.
+- Firebase Authentication/Firestore preparados para admin/editor/reader da mesma equipe. Configuração, migração e homologação do projeto real ainda são necessárias.
 
-## Limites atuais
+## Diagnóstico por texto e IA
 
-É uma base funcional para evolução, ainda sem equivalência completa com o sistema anterior. A importação preserva a carteira antiga para consulta e deriva cadastros de bancos/gerentes dos vínculos, sem transformar as operações antigas nos novos fluxos. Não há migração para o Firebase real, anexos, Gmail, envio automático de mensagens, simulações bancárias, gestão de garantias de clientes ou portal externo. O faturamento da operação existe no modelo, mas ainda não tem editor na tela.
+**Ler campos do texto** funciona sem API. Uma informação por linha, com nome do campo e valor:
 
-O JSON do pipeline não substitui a exportação das bases completas de bancos e gerentes. Critérios, contatos e taxas ausentes não recebem valores presumidos. A aplicação não interpreta textos dos arquivos como comandos. E-mails de exemplo exibidos como placeholders não devem ser cadastrados como contatos reais. Logs dos novos cadastros registram autor, momento, versão e nomes dos campos alterados; não são um backup com restauração de versões.
+```text
+História e fundação: Informação declarada pela empresa.
+Faturamento LTM: 1.200.000,00
+EBITDA LTM: 120.000,00
+Fontes e data-base: Demonstrações fornecidas, período informado.
+```
 
-Na prévia, use **Base recebida → Importar JSON** para conferir os totais e confirmar a importação. Arquivos de até 8 MB ficam somente no SQLite local, fora da pasta pública. A importação em lote ainda não está disponível no Firebase; as telas de bancos e gerentes possuem gravação individual autenticada preparada para esse ambiente.
+Revise e clique **Aplicar campos revisados**. Os valores acima ilustram apenas o formato. As sugestões ficam no rascunho até salvar.
 
-O assistente não faz chamadas à OpenAI nem mantém uma conversa automática dentro do CRM. O usuário escolhe o contexto que levará à conversa. Para uma integração automática será necessário um serviço autenticado no servidor, chave protegida, limite de consumo e registro de ações; nunca uma chave no navegador.
+Para texto livre na **prévia local**, configure `OPENAI_API_KEY` e `OPENAI_MODEL` no ambiente do processo servidor por um meio seguro e reinicie. Nunca use variáveis `VITE_*`, navegador ou Git para a chave. O botão permanece indisponível sem configuração.
 
-No Firebase, esta versão acompanha até **250 operações recentes e 100 eventos recentes**. Busca, indicadores e exportação se referem a esse conjunto, não a um backup completo. Antes de ultrapassar esse volume, implementar paginação, busca e totais no servidor. Os registros antigos permanecem no banco.
+A integração usa Responses API, JSON estruturado, `store:false`, prazo de 45 segundos, uma extração por vez e evidências literais verificadas. O usuário revisa antes de aplicar. Apenas o texto escolhido é enviado; a carteira não é enviada automaticamente. Instruções no texto são conteúdo. Evidências ajudam a conferir, mas não dispensam revisão. Os testes usam respostas simuladas; não houve chamada real nesta entrega.
 
-Todos os membros ativos de uma equipe podem visualizar suas operações. Editores e administradores podem criar/alterar; leitores consultam. Ainda não existe restrição por responsável nem tela de administração de membros. Não há exclusão pela aplicação.
+O site publicado **não executa o servidor local**. IA em produção requer endpoint autenticado com Firebase, limites de consumo e segredo no servidor. A assinatura ChatGPT não inclui automaticamente créditos de API. [Saídas estruturadas da OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs).
 
-## Publicar
+## Premissas de cálculo e documentos
 
-Siga [PUBLICAR.md](PUBLICAR.md). O arquivo `firebase.json` publica apenas Hosting em um destino separado chamado `lr-v2`. Ele não implanta regras nem modifica automaticamente o site existente. O build sem configuração mostra uma tela de configuração, sem os dados fictícios.
+Simulação prefixada mensal, vencimentos no dia da liberação limitados ao último dia do mês, arredondamento a centavos e última parcela reconciliando o saldo. Carência integra o prazo total; juros podem ser capitalizados ou pagos. Seguro mensal incide também na carência. Custos antecipados reduzem o líquido; financiados integram o saldo.
 
-Para usar o Firebase atual, primeiro revisar suas regras: uma permissão geral existente pode liberar a nova coleção mesmo quando adicionamos regras mais restritivas. Uma nova coleção não representa isolamento de segurança por si só. Alternativamente, usar um projeto Spark separado durante a validação.
+IOF diário é ponderado pelo principal amortizado, limitado a 365 dias; juros capitalizados da carência não são tratados como novo principal diário. IOF financiado usa cálculo iterativo. Alíquotas são visíveis e editáveis porque o enquadramento e as exceções dependem da operação. Não há modelagem de crédito rotativo, desconto de recebíveis, taxa pós-fixada ou dias úteis. CET estimado resolve o fluxo por datas em base 365; custos não informados não entram no cálculo. Referências: [regulamento do IOF](https://www2.camara.leg.br/legin/fed/decret/2007/decreto-6306-14-dezembro-2007-566561-normaatualizada-pe.html), [Resolução CMN 4.881 — CET](https://www.bcb.gov.br/content/estabilidadefinanceira/especialnor/Resolu%C3%A7%C3%A3o4881.pdf).
 
-## Verificações
+O contrato reproduz o padrão fornecido com consulta integrada e assinatura única. Não constitui parecer jurídico ou aceite do cliente. Instituições podem exigir formalidades próprias. Adicionar instituição após a assinatura exige novo aceite. A assinatura eletrônica e o envio para assinatura não estão integrados.
+
+O diagnóstico usa os períodos informados. Faturamento anual do cadastro não é presumido como LTM. Mostra índices calculados com bases suficientes, ou valores manuais quando elas faltarem. Texto maior que o espaço do modelo gera aviso antes da exportação, sem truncar o cadastro.
+
+## Dados e limites
+
+O JSON do pipeline não contém necessariamente toda a base de bancos/gerentes, contatos, anexos ou histórico integral por instituição. Status sem definição permanecem como códigos originais. Campos ausentes não recebem condições presumidas. Dados brutos ficam em **Base recebida**.
+
+Na prévia, o estado completo é enviado via SSE. No Firebase, as coleções operacionais têm listeners em tempo real. Histórico visível: 100 eventos de operações, 200 do diretório, 400 de documentos. Não há limite artificial de 250 operações; crescimento significativo exigirá paginação/consulta no servidor para controlar leituras e memória. Todos os membros ativos visualizam a mesma equipe; não há filtro de permissão por responsável.
+
+As regras validam equipe, permissão, vínculo, versão e auditoria. Registros complementares usam `contentJson`, limitado a 150 mil caracteres: os campos internos são validados pela aplicação e pelo servidor da prévia, **não por um parser nas regras Firestore**. Para validação independente do cliente em produção, adotar endpoint autenticado ou campos normalizados com regras específicas antes de liberar integrações externas.
+
+Ainda não há migração local → Firebase, anexos/contratos assinados, Gmail, portal do cliente, automações de envio ou conversa automática completa. Exportação não substitui backup. O banco e o site originais não foram modificados.
+
+## Testar e publicar
 
 ```powershell
 npm test
 npm run build
 ```
 
-Com Java 21 instalado, as regras podem ser testadas localmente sem acessar um projeto real:
+O GitHub Actions também executa as regras em emulador Firestore com Java 21 e projeto `demo-`. Testes abrangem cálculos, datas, ausências, documentos, importação, idempotência, persistência, conflito e permissões.
 
-```powershell
-npx --yes firebase-tools@15.31.0 emulators:exec --project demo-lr-capital-v2 --config firebase.test.json --only firestore "node --test tests/firestore.rules.integration.mjs"
-```
+Siga [PUBLICAR.md](PUBLICAR.md). `firebase.json` publica apenas Hosting no destino separado `lr-v2`; não implanta regras nem altera o site existente. Banco local e modelo privado não entram no build. Após configurar e homologar o Firebase, migrar dados de forma revisada e importar o modelo pela aba Contratos.
 
-O mesmo comando é executado pelo GitHub Actions. Uma verificação verde no emulador não substitui a homologação do projeto real, dos usuários e das regras combinadas com as do sistema antigo.
+| Área                    | Arquivos                                       |
+| ----------------------- | ---------------------------------------------- |
+| Carteira e instituições | `src/ClientPortfolio.tsx`                      |
+| Contratos e diagnóstico | `src/DocumentPages.tsx`, `src/pdf.ts`          |
+| Cálculos                | `src/credit.ts`, `src/diagnosis.ts`            |
+| Importação              | `server/migratePipeline.ts`                    |
+| Extração com IA         | `server/diagnosisAi.ts`                        |
+| Firebase e permissões   | `src/firebaseRepository.ts`, `firestore.rules` |
 
-## Organização
-
-| Área | Arquivo/pasta |
-| --- | --- |
-| Interface | `src/main.tsx`, `src/styles.css` |
-| Valores, validações e propostas | `src/domain.ts` |
-| Persistência de produção | `src/firebaseRepository.ts` |
-| Prévia local persistente | `server/preview.ts` |
-| Permissões de produção | `firestore.rules` |
-| Verificações automáticas | `tests/`, `.github/workflows/ci.yml` |
-
-## Próximas entregas
-
-1. Conectar um ambiente Firebase de homologação e validar duas contas em computadores diferentes.
-2. Preparar importação revisável dos dados antigos, preservando IDs, valores e vínculos.
-3. Completar campos e fluxos de garantias, recebíveis e documentos conforme a rotina da equipe.
-4. Implementar o assistente automático e as integrações de e-mail com orçamento definido.
-
-O desenvolvimento por aqui permite revisar a prévia antes de cada publicação. As atualizações ficam registradas neste repositório.
+O leitor local usa [PDF.js](https://mozilla.github.io/pdf.js/examples/).

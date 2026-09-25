@@ -1,6 +1,6 @@
 # Publicar a LR Capital no Firebase
 
-Guia da versão 0.1 — 24/09/2026. O código está preparado para publicação estática, mas ainda precisa ser conectado ao projeto Firebase e às contas da equipe. Nenhum projeto de produção foi alterado nesta entrega.
+Guia da versão 0.3 — 25/09/2026. O código está preparado para publicação estática, mas ainda precisa ser conectado ao projeto Firebase e às contas da equipe. Nenhum projeto de produção foi alterado nesta entrega.
 
 ## 1. Entender o que pode ficar sem custo
 
@@ -8,9 +8,9 @@ Use **Firebase Hosting**, Authentication com e-mail/senha e Cloud Firestore. Par
 
 Limites gratuitos documentados no momento da consulta:
 
-| Serviço | Cota gratuita relevante |
-| --- | --- |
-| Hosting | 10 GB de armazenamento e 10 GB/mês de transferência |
+| Serviço   | Cota gratuita relevante                                                                               |
+| --------- | ----------------------------------------------------------------------------------------------------- |
+| Hosting   | 10 GB de armazenamento e 10 GB/mês de transferência                                                   |
 | Firestore | 1 GiB de dados, 50 mil leituras/dia, 20 mil gravações/dia, 20 mil exclusões/dia e 10 GiB/mês de saída |
 
 As cotas são limitadas e compartilhadas conforme o projeto. A sincronização gera leituras; abrir sessões e manter vários usuários conectados consome a franquia. Uma gravação nesta aplicação grava a operação e o histórico. Regras que consultam documentos também podem gerar leituras. Se o projeto existente usa Blaze, sua cobrança continua sujeita ao consumo: este guia não muda esse plano.
@@ -19,7 +19,7 @@ Fontes: [cotas do Hosting](https://firebase.google.com/docs/hosting/usage-quotas
 
 Esta versão não depende de Cloud Functions, Cloud Run ou upload de anexos. Cloud Storage for Firebase requer Blaze atualmente, mesmo com faixas de uso gratuito; não ativar esse recurso esperando garantia de custo zero. [Requisitos de Storage](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024).
 
-A integração automática com OpenAI tem consumo de API separado. O modo assistido atual não chama a API. A assinatura do ChatGPT não equivale a créditos de API. [Preços da API](https://developers.openai.com/api/docs/pricing).
+A integração automática com OpenAI tem consumo de API separado. A leitura de texto estruturado funciona sem API; a extração de texto livre chama a API somente quando configurada no servidor da prévia e solicitada pelo usuário. A assinatura do ChatGPT não equivale a créditos de API. [Preços da API](https://developers.openai.com/api/docs/pricing).
 
 ## 2. Escolher o ambiente
 
@@ -101,9 +101,9 @@ Em Authentication → Settings → Authorized domains, confira o domínio de ace
 - Desativar uma conta de teste e confirmar a perda de acesso.
 - Conferir no Firebase os erros e o consumo de leituras/gravações.
 
-A versão 0.2 importa o arquivo do pipeline para consulta e deriva cadastros de bancos/gerentes **somente na prévia local**. A migração para o Firebase continua pendente e deve preservar origem, IDs, valores solicitados/aprovados, responsáveis e relacionamentos, com relatório de conferência. Não copie dados reais para arquivos do GitHub. A exportação da tela é limitada ao conjunto carregado e não substitui backup do banco.
+A versão 0.3 importa o pipeline para a carteira operacional, com perfis e instituições por cliente, e deriva bancos/gerentes **somente na prévia local**. A migração para o Firebase continua pendente e deve preservar origem, IDs, valores solicitados/aprovados, responsáveis e relacionamentos, com relatório de conferência. Não copie dados reais para arquivos do GitHub. A exportação da tela é limitada ao conjunto carregado e não substitui backup do banco.
 
-As regras da versão 0.2 incluem `directory` e `directoryEvents`, necessários para as telas de bancos/gerentes. Cadastros individuais são gravados com histórico e versão, e o servidor recusa gerente vinculado a uma instituição inexistente. Antes de atualizar um ambiente Firebase, homologar esse conjunto de regras conforme a seção 5. O arquivo bruto importado para comparação não é publicado nem sincronizado com o Firebase nesta versão.
+As regras da versão 0.3 incluem `directory` e `directoryEvents`, necessários para as telas de bancos/gerentes. Cadastros individuais são gravados com histórico e versão, e o servidor recusa gerente vinculado a uma instituição inexistente. Antes de atualizar um ambiente Firebase, homologar esse conjunto de regras conforme a seção 5. O arquivo bruto importado para comparação não é publicado nem sincronizado com o Firebase nesta versão.
 
 ## 8. Atualizações depois da primeira publicação
 
@@ -121,3 +121,5 @@ O Firebase Hosting mantém histórico de versões da interface e permite reverte
 ## Próximo passo para IA automática
 
 Adicionar um serviço autenticado que valide o usuário Firebase, consulte apenas a equipe permitida, chame a OpenAI com chave no servidor e devolva propostas estruturadas. Alterações precisam passar pela mesma validação e controle de versão. Envio de mensagens, exclusões e decisões de crédito exigem fluxos próprios de revisão. O custo de modelo e hospedagem desse serviço deve ser definido antes da ativação.
+
+As regras incluem também records e recordEvents para contratos, diagnósticos, simulações e subitens. Após a migração revisada, o administrador pode importar o modelo privado em Contratos → Modelo padrão. A gravação em tempo real entre usuários depende da configuração e homologação do Firebase.

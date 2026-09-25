@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
+  ClipboardList,
   ArrowDownToLine,
   ArrowRight,
   ArrowUpRight,
@@ -58,7 +59,19 @@ import "./styles.css";
 import { DirectoryPage, ComparisonPage } from "./DirectoryPages";
 import { emptyDirectory } from "./directory";
 
+import { ClientPortfolio } from "./ClientPortfolio";
+const DocumentPage = React.lazy(() =>
+  import("./DocumentPages").then((m) => ({ default: m.DocumentPage })),
+);
+const SimulatorPage = React.lazy(() =>
+  import("./SimulatorPage").then((m) => ({ default: m.SimulatorPage })),
+);
+import { isInactive } from "./records";
+
 type Page =
+  | "contracts"
+  | "diagnosis"
+  | "simulator"
   | "banks"
   | "managers"
   | "comparison"
@@ -70,6 +83,9 @@ type Page =
   | "settings";
 const navigation = [
   { id: "operations", label: "Carteira de operações", icon: BriefcaseBusiness },
+  { id: "contracts", label: "Contratos", icon: FileText },
+  { id: "simulator", label: "Simulador de crédito", icon: BarChart3 },
+  { id: "diagnosis", label: "Diagnóstico financeiro", icon: ClipboardList },
   { id: "tasks", label: "Próximas ações", icon: CheckCheck },
   { id: "dashboard", label: "Visão geral", icon: BarChart3 },
   { id: "history", label: "Atividades", icon: History },
@@ -107,6 +123,7 @@ function App() {
     operations: [],
     activities: [],
   });
+  const [selectedClient, setSelectedClient] = useState("");
   const [page, setPage] = useState<Page>("operations");
   const [error, setError] = useState("");
   const [authError, setAuthError] = useState("");
@@ -157,11 +174,16 @@ function App() {
   }, [notice]);
   const operations = state.operations;
   const active = operations.filter(
-    (o) => !["Retomada", "Liberado"].includes(o.stage),
+    (o) =>
+      !isInactive(o.stage) &&
+      !["Liberado", "Crédito na Conta"].includes(o.stage),
   );
   const late = operations.filter(isLate);
   const due = operations.filter(
-    (o) => o.dueDate === today() && o.stage !== "Liberado",
+    (o) =>
+      o.dueDate === today() &&
+      !isInactive(o.stage) &&
+      !["Liberado", "Crédito na Conta"].includes(o.stage),
   );
   const owners = [...new Set(operations.map((o) => o.owner))].sort();
   const filtered = useMemo(
@@ -183,6 +205,7 @@ function App() {
   const canEdit = session?.role !== "reader";
   const navigate = (p: Page) => {
     setPage(p);
+    window.scrollTo({ top: 0 });
     setMobileNav(false);
   };
   const save = async (input: OperationInput, version: number | null) => {
@@ -357,7 +380,7 @@ function App() {
             <p>
               {["banks", "managers", "comparison"].includes(page)
                 ? "Cadastros e arquivo recebido · salvos neste computador"
-                : "Carteira de demonstração · exemplos fictícios"}{" "}
+                : "Carteira importada · alterações salvas neste computador"}{" "}
               · produção preservada
             </p>
             <button onClick={() => navigate("settings")}>
@@ -372,325 +395,44 @@ function App() {
               {error}
             </div>
           )}
-          {page === "operations" && (
-            <>
-              <div className="page-title">
-                <div>
-                  <div className="eyebrow">GESTÃO DE CRÉDITO</div>
-                  <h1>
-                    Carteira de operações<span className="title-dot">.</span>
-                  </h1>
-                  <p>Acompanhe cada etapa. Saiba qual é o próximo passo.</p>
-                </div>
-                <div className="title-actions">
-                  <button
-                    className="button secondary"
-                    onClick={() =>
-                      download(`lr-capital-${today()}.json`, {
-                        schemaVersion: 2,
-                        exportedAt: new Date().toISOString(),
-                        operations:state.operations,
-                        activities:state.activities,
-                      })
-                    }
-                  >
-                    <ArrowDownToLine size={16} />
-                    Exportar
-                  </button>
-                  <button
-                    className="button primary"
-                    disabled={!canEdit}
-                    onClick={() => setModal("new")}
-                  >
-                    <Plus size={17} />
-                    Nova operação
-                  </button>
-                </div>
-              </div>
-              <div className="stats-grid">
-                <Stat
-                  label="CARTEIRA ATIVA"
-                  value={String(active.length).padStart(2, "0")}
-                  caption="operações em andamento"
-                  icon={<BriefcaseBusiness size={18} />}
-                />
-                <Stat
-                  label="VOLUME SOLICITADO"
-                  value={shortMoney(
-                    active.reduce((sum, o) => sum + (o.requestedCents ?? 0), 0),
-                  )}
-                  caption={`${active.filter((o) => o.requestedCents === null).length} sem valor informado`}
-                  icon={<ArrowUpRight size={19} />}
-                />
-                <Stat
-                  label="RETORNOS PARA HOJE"
-                  value={String(due.length).padStart(2, "0")}
-                  caption="próximas ações da equipe"
-                  icon={<CalendarDays size={18} />}
-                  onClick={() => navigate("tasks")}
-                />
-                <Stat
-                  label="PRECISAM DE ATENÇÃO"
-                  value={String(late.length).padStart(2, "0")}
-                  caption="retornos com prazo vencido"
-                  icon={<Clock3 size={18} />}
-                  attention={late.length > 0}
-                  onClick={() => {
-                    setOnlyLate(!onlyLate);
-                  }}
-                />
-              </div>
-              <div className="work-grid">
-                <section className="portfolio-panel">
-                  <div className="product-tabs">
-                    <button
-                      className={product === "Todos" ? "active" : ""}
-                      onClick={() => setProduct("Todos")}
-                    >
-                      Toda a carteira <span>{operations.length}</span>
-                    </button>
-                    {products.slice(0, 3).map((p) => (
-                      <button
-                        key={p}
-                        className={product === p ? "active" : ""}
-                        onClick={() => setProduct(p)}
-                      >
-                        {p === "Antecipação de recebíveis" ? "Recebíveis" : p}
-                        <span>
-                          {operations.filter((o) => o.product === p).length}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="table-tools">
-                    <label className="search">
-                      <Search size={17} />
-                      <input
-                        aria-label="Pesquisar operações"
-                        placeholder="Buscar empresa, responsável ou instituição…"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-                      {search && (
-                        <button
-                          aria-label="Limpar busca"
-                          onClick={() => setSearch("")}
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </label>
-                    <div className="filters">
-                      <label>
-                        <Users size={15} />
-                        <select
-                          aria-label="Filtrar responsável"
-                          value={owner}
-                          onChange={(e) => setOwner(e.target.value)}
-                        >
-                          <option value="Todos">Responsáveis</option>
-                          {owners.map((o) => (
-                            <option key={o}>{o}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        <ListFilter size={15} />
-                        <select
-                          aria-label="Filtrar etapa"
-                          value={stage}
-                          onChange={(e) => setStage(e.target.value)}
-                        >
-                          <option value="Todas">Todas as etapas</option>
-                          {stages.map((s) => (
-                            <option key={s}>{s}</option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                  </div>
-                  {onlyLate && (
-                    <div className="active-filter">
-                      Retornos vencidos{" "}
-                      <button
-                        onClick={() => setOnlyLate(false)}
-                        aria-label="Remover filtro de vencidos"
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
-                  )}
-                  {!loaded ? (
-                    <Empty title="Carregando operações…" loading />
-                  ) : filtered.length === 0 ? (
-                    <Empty
-                      title="Nenhuma operação encontrada"
-                      description={
-                        operations.length
-                          ? "Ajuste os filtros para ver outros registros."
-                          : "Cadastre sua primeira operação para começar."
-                      }
-                    />
-                  ) : (
-                    <div className="table-scroll">
-                      <table className="operation-table">
-                        <thead>
-                          <tr>
-                            <th>EMPRESA / OPERAÇÃO</th>
-                            <th>ETAPA</th>
-                            <th>VALOR SOLICITADO</th>
-                            <th>PRÓXIMO PASSO</th>
-                            <th>RESPONSÁVEL</th>
-                            <th>
-                              <span className="sr-only">Abrir</span>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filtered.map((op) => (
-                            <tr key={op.id} onClick={() => setModal(op)}>
-                              <td>
-                                <button
-                                  className="company-cell"
-                                  onClick={() => setModal(op)}
-                                >
-                                  <span
-                                    className={`company-icon company-${operations.indexOf(op) % 4}`}
-                                  >
-                                    <Building2 size={17} />
-                                  </span>
-                                  <span>
-                                    <strong>{op.company}</strong>
-                                    <small>{op.product}</small>
-                                  </span>
-                                </button>
-                              </td>
-                              <td>
-                                <span className={stageClass(op.stage)}>
-                                  <i />
-                                  {op.stage}
-                                </span>
-                              </td>
-                              <td>
-                                <span className="table-money">
-                                  {money(op.requestedCents)}
-                                </span>
-                                <small className="institution">
-                                  {op.institution || "Instituição a definir"}
-                                </small>
-                              </td>
-                              <td>
-                                <span className="next-action">
-                                  {op.nextAction || "Definir próxima ação"}
-                                </span>
-                                <span
-                                  className={`deadline ${isLate(op) ? "late" : ""}`}
-                                >
-                                  <CalendarDays size={12} />
-                                  {op.dueDate === today()
-                                    ? "Hoje"
-                                    : displayDate(op.dueDate)}
-                                  {isLate(op) && " · atrasado"}
-                                </span>
-                              </td>
-                              <td>
-                                <span className="owner-cell">
-                                  <span className="avatar tiny">
-                                    {initials(op.owner)}
-                                  </span>
-                                  {op.owner}
-                                </span>
-                              </td>
-                              <td>
-                                <ChevronRight size={16} className="muted" />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  <div className="table-footer">
-                    <span>
-                      {filtered.length}{" "}
-                      {filtered.length === 1 ? "operação" : "operações"}
-                      {repo.mode === "firebase"
-                        ? " · até 250 registros recentes"
-                        : ""}
-                    </span>
-                    <span>
-                      <ShieldCheck size={13} />
-                      Histórico preservado
-                    </span>
-                  </div>
-                </section>
-                <aside className="right-column">
-                  <section className="today-card">
-                    <div className="card-heading">
-                      <div className="heading-icon">
-                        <CalendarDays size={18} />
-                      </div>
-                      <h2>Foco do dia</h2>
-                      <span>{due.length + late.length}</span>
-                    </div>
-                    <p className="card-description">
-                      Retornos que merecem sua atenção.
-                    </p>
-                    {[...late, ...due.filter((o) => !isLate(o))]
-                      .slice(0, 3)
-                      .map((op, i) => (
-                        <button
-                          className="focus-item"
-                          key={op.id}
-                          onClick={() => setModal(op)}
-                        >
-                          <span className="focus-index">
-                            {String(i + 1).padStart(2, "0")}
-                          </span>
-                          <span>
-                            <strong>{op.company}</strong>
-                            <p>{op.nextAction}</p>
-                            <small className={isLate(op) ? "late-text" : ""}>
-                              {isLate(op) ? "Prazo vencido" : "Hoje"} ·{" "}
-                              {op.owner}
-                            </small>
-                          </span>
-                          <ArrowUpRight size={15} />
-                        </button>
-                      ))}
-                    {!due.length && !late.length && (
-                      <p className="quiet-state">
-                        Nenhum retorno vencido ou para hoje.
-                      </p>
-                    )}
-                    <button
-                      className="text-button"
-                      onClick={() => navigate("tasks")}
-                    >
-                      Ver próximas ações <ArrowRight size={15} />
-                    </button>
-                  </section>
-                  <section className="assistant-card">
-                    <div className="spark-box">
-                      <Sparkles size={21} />
-                    </div>
-                    <span className="eyebrow">ASSISTENTE LR</span>
-                    <h2>
-                      Mais clareza para
-                      <br />a próxima decisão.
-                    </h2>
-                    <p>
-                      Leve o contexto da operação para sua conversa com o
-                      ChatGPT.
-                    </p>
-                    <button onClick={() => navigate("assistant")}>
-                      Preparar análise <ArrowUpRight size={16} />
-                    </button>
-                    <small>Modo assistido · sem chamada de API</small>
-                  </section>
-                </aside>
-              </div>
-            </>
+          {page === "operations" && repo && (
+            <ClientPortfolio
+              state={state}
+              repo={repo}
+              canEdit={canEdit}
+              onEdit={setModal}
+              notify={setNotice}
+              onModule={(p, id) => {
+                setSelectedClient(id);
+                navigate(p);
+              }}
+            />
+          )}
+          {(page === "contracts" || page === "diagnosis") && repo && (
+            <React.Suspense fallback={<p>Carregando documentos…</p>}>
+              <DocumentPage
+                key={page}
+                kind={page}
+                state={state}
+                repo={repo}
+                canEdit={canEdit}
+                selectedId={selectedClient}
+                select={setSelectedClient}
+                notify={setNotice}
+              />
+            </React.Suspense>
+          )}
+          {page === "simulator" && repo && (
+            <React.Suspense fallback={<p>Carregando simulador…</p>}>
+              <SimulatorPage
+                state={state}
+                repo={repo}
+                canEdit={canEdit}
+                selectedId={selectedClient}
+                select={setSelectedClient}
+                notify={setNotice}
+              />
+            </React.Suspense>
           )}
           {page === "tasks" && (
             <>
@@ -943,7 +685,7 @@ function App() {
                   </h2>
                   <p>
                     {repo.mode === "preview"
-                      ? "A carteira de demonstração, os cadastros e a base recebida ficam gravados neste computador. Duas abas desta prévia recebem alterações de cadastro automaticamente."
+                      ? "A carteira importada, os cadastros e os documentos ficam gravados neste computador. Duas abas desta prévia recebem alterações automaticamente."
                       : "As alterações são gravadas no Firestore e acompanhadas em tempo real pela equipe autorizada."}
                   </p>
                   <dl>
@@ -995,7 +737,7 @@ function App() {
             <span>
               LR CAPITAL <i /> Gestão de operações
             </span>
-            <span>Nova versão · 0.2</span>
+            <span>Nova versão · 0.3</span>
           </footer>
         </main>
       </div>
@@ -1215,6 +957,11 @@ function OperationModal({
       ? ""
       : String(original.requestedCents / 100).replace(".", ","),
   );
+  const [revenue, setRevenue] = useState(
+    original?.revenueCents == null
+      ? ""
+      : String(original.revenueCents / 100).replace(".", ","),
+  );
   const [approved, setApproved] = useState(
     original?.approvedCents === null || !original
       ? ""
@@ -1344,6 +1091,7 @@ function OperationModal({
                     ...form,
                     requestedCents: parseMoney(requested),
                     approvedCents: parseMoney(approved),
+                    revenueCents: parseMoney(revenue),
                   }),
                   original?.version ?? null,
                 );
@@ -1420,6 +1168,14 @@ function OperationModal({
                       onChange={(e) => setApproved(e.target.value)}
                     />
                   </label>
+                  <label>
+                    Faturamento anual (R$)
+                    <input
+                      inputMode="decimal"
+                      value={revenue}
+                      onChange={(e) => setRevenue(e.target.value)}
+                    />
+                  </label>
                   <label className="span2">
                     Instituição
                     <input
@@ -1439,7 +1195,7 @@ function OperationModal({
                       Ação
                       <textarea
                         rows={2}
-                        maxLength={500}
+                        maxLength={12000}
                         placeholder="O que precisa acontecer agora?"
                         value={form.nextAction}
                         onChange={field("nextAction")}

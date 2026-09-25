@@ -1508,4 +1508,7 @@ function Assistant({
   );
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+// Reutiliza a raiz durante atualizações da prévia para não duplicar montagens.
+const appRoot = import.meta.hot?.data.appRoot ?? createRoot(document.getElementById("root")!);
+if (import.meta.hot) import.meta.hot.data.appRoot = appRoot;
+appRoot.render(<App />);

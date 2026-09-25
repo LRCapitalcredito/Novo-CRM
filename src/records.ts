@@ -1,6 +1,7 @@
 import { validDate } from "./domain";
 import { simulateCredit } from "./credit";
 import { narrativeFields, numericFields } from "./diagnosis";
+import { validateDeal } from "./deals";
 export type RecordKind =
   | "profile"
   | "placement"
@@ -54,6 +55,7 @@ export function validateRecord(raw: any): RecordInput {
   )
     throw new Error("Cadastro complementar inválido.");
   if (raw.kind === "placement") {
+    if (raw.data.deal !== undefined) validateDeal(raw.data.deal);
     for (const key of [
       "bankId",
       "institution",
@@ -247,6 +249,6 @@ export const originStatuses: Record<string, string> = {
 export const statusLabel = (v: unknown) =>
   originStatuses[String(v)] ?? String(v || "Não informado");
 export const isInactive = (s: string) =>
-  /^(parado|perdido|sem interesse|não enviado|nao enviado|no show|retomada)$/i.test(
+  /^(parado|perdido|negado|sem interesse|não enviado|nao enviado|no show|retomada)$/i.test(
     s.trim(),
   );

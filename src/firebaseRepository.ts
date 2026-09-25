@@ -398,6 +398,7 @@ export function firebaseRepository(config: Config): Repository {
             ? {
                 company: v.company,
                 stage: v.stage,
+                product: v.product,
                 requestedCents: v.requestedCents,
                 approvedCents: v.approvedCents,
                 nextAction: v.nextAction,

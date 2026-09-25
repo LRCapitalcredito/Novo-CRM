@@ -1,10 +1,19 @@
 # LR Capital · Novo CRM
 
-Versão 0.4: carteira, atuação por instituição, bancos, gerentes, contratos, simulador e diagnóstico financeiro, com identidade oficial da LR Capital e capa interativa. React + TypeScript; prévia com SQLite; adaptador Firebase para o ambiente publicado. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
+Versão 0.5: carteira, atuação por instituição, bancos, gerentes, contratos, simulador e diagnóstico financeiro, com identidade oficial da LR Capital e capa interativa. React + TypeScript; prévia com SQLite; adaptador Firebase para o ambiente publicado. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
+
+### Edição e condições por modalidade
+
+- Status e modalidade editáveis diretamente na carteira. O nome abre os vínculos; as seleções salvam com confirmação e histórico. Uma versão desatualizada é recusada sem sobrescrever outras alterações.
+- Carteiras de captação, recebíveis, home equity e outras possibilidades consideram a classificação do cliente e das propostas. Um cliente pode aparecer em mais de uma; o total geral não duplica cadastros. O texto legado não é interpretado como uma classificação confiável.
+- Em cada instituição, **Abrir → Condições da proposta** permite informar modalidade, taxa mensal e prazo.
+- Recebíveis: limite, utilização em aberto, volume de uma competência e comissão percentual. Disponível = limite menos utilização; pode ser negativo e recebe alerta. Comissão estimada = volume da competência × percentual, arredondada a centavos, sem reconhecer receita recebida. O formulário mantém a competência atual; mudanças ficam auditadas, mas não constitui um extrato mensal.
+- Home equity: avaliação do imóvel e LTV calculado sobre o aprovado, ou solicitado quando o aprovado está ausente. Garantia ausente/zero não produz índice. A relação não determina elegibilidade nem aprovação.
+- Campos desconhecidos ficam vazios. Taxas e prazo são condições informadas, não CET ou ofertas bancárias.
 
 ### Visualização e rotina
 
-- Logo oficial no acesso, menu, capa e ícone do navegador. Retratos de Ricardo Reis, Lucas Macedo e Giovani Moura de Souza reaproveitados dos materiais do site fornecidos pelo usuário; apresentação conferida em https://www.lrcapitalcredito.com/.
+- Logo oficial no acesso, menu e ícone do navegador. Retratos de Ricardo Reis, Lucas Macedo e Giovani Moura de Souza reaproveitados dos materiais do site fornecidos pelo usuário; apresentação conferida em https://www.lrcapitalcredito.com/.
 - Capa recolhível e apresentação institucional com perfis dos sócios, navegação por teclado e respeito à preferência por movimento reduzido.
 - Resumo clicável da carteira, radar de retornos de hoje, vencidos e sem prazo. Considera os prazos explícitos do cliente e dos vínculos ativos. Cada cliente conta uma vez; cadastros concluídos ou para retomada não aparecem como atrasos da operação corrente. Datas de atualização não são prazos.
 - Ordenação inicial por operações ativas e prazo; opções por nome, demanda, retorno e ordem original. Busca também por contato, instituição e gerente dos vínculos.

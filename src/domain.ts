@@ -34,12 +34,17 @@ export const stages = [
   "Lead",
   "sem_restricao",
   "com_restricao",
+  "Negado",
 ] as const;
 export const products = [
   "Capital de giro",
   "Antecipação de recebíveis",
   "Home equity",
   "Financiamento",
+  "Crédito estruturado",
+  "Reestruturação de dívida",
+  "Crédito rural",
+  "Outras modalidades",
   "Não informado",
 ] as const;
 export type Stage = (typeof stages)[number];

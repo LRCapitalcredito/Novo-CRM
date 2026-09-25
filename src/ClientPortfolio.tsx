@@ -23,6 +23,7 @@ import {
   parseMoney,
   displayDate,
   today,
+  products,
   type Operation,
   type WorkspaceState,
 } from "./domain";
@@ -35,7 +36,9 @@ import {
   type WorkspaceRecord,
 } from "./records";
 import type { Repository } from "./repository";
-import { isWorking, matchesAttention, normalizeSearch, portfolioIndex, priorityOrder, stageTone, type Attention } from "./portfolio";
+import { isWorking, matchesAttention, matchesModality, modalityGroups, normalizeSearch, portfolioIndex, priorityOrder, stageTone, type Attention, type ModalityGroup } from "./portfolio";
+import { InlineOperationControls } from "./InlineOperationControls";
+import { DealFields, DealSummary, dealDraft, readDeal } from "./DealFields";
 import "./modules.css";
 const err = (e: unknown) =>
   e instanceof Error ? e.message : "Não foi possível salvar.";
@@ -58,6 +61,7 @@ export function ClientPortfolio({
     [filter, setFilter] = useState("Todos"),
     [owner, setOwner] = useState("Todos"),
     [product, setProduct] = useState("Todos"),
+    [modality, setModality] = useState<ModalityGroup>("Todas as modalidades"),
     [attention, setAttention] = useState<Attention>("all"),
     [sort, setSort] = useState("priority"),
     [currentPage, setCurrentPage] = useState(1),
@@ -82,7 +86,7 @@ export function ClientPortfolio({
     const result = index.filter((r) => {
       const o = r.operation;
       return (filter === "Todos" || (filter === "Em atuação" ? isWorking(o) : filter === "Para retomada" ? isInactive(o.stage) : !isWorking(o) && !isInactive(o.stage)))
-        && (owner === "Todos" || o.owner === owner) && (product === "Todos" || o.product === product)
+        && (owner === "Todos" || o.owner === owner) && (product === "Todos" || o.product === product || r.links.some((p) => p.data.deal?.modality === product)) && matchesModality(r, modality)
         && matchesAttention(r, attention) && r.search.includes(normalizeSearch(search));
     });
     if (sort === "priority") result.sort(priorityOrder);
@@ -90,13 +94,13 @@ export function ClientPortfolio({
     if (sort === "amount") result.sort((a, b) => (b.operation.requestedCents ?? -1) - (a.operation.requestedCents ?? -1));
     if (sort === "due") result.sort((a, b) => (a.nextDue || "9999").localeCompare(b.nextDue || "9999"));
     return result;
-  }, [index, filter, owner, product, attention, search, sort]);
-  useEffect(() => { setCurrentPage(1); }, [search, filter, owner, product, attention, sort]);
+  }, [index, filter, owner, product, modality, attention, search, sort]);
+  useEffect(() => { setCurrentPage(1); }, [search, filter, owner, product, modality, attention, sort]);
   const pages = Math.max(1, Math.ceil(rows.length / 25)), page = Math.min(currentPage, pages);
   const displayed = rows.slice((page - 1) * 25, page * 25);
-  const reset = () => { setSearch(""); setOwner("Todos"); setProduct("Todos"); setFilter("Todos"); setAttention("all"); setSort("priority"); };
+  const reset = () => { setSearch(""); setOwner("Todos"); setProduct("Todos"); setModality("Todas as modalidades"); setFilter("Todos"); setAttention("all"); setSort("priority"); };
   const selectSummary = (nextFilter: string, nextAttention: Attention = "all") => { reset(); setFilter(nextFilter); setAttention(nextAttention); };
-  const filtered = search || owner !== "Todos" || product !== "Todos" || filter !== "Todos" || attention !== "all";
+  const filtered = search || owner !== "Todos" || product !== "Todos" || modality !== "Todas as modalidades" || filter !== "Todos" || attention !== "all";
   return (
     <section className={`module-page portfolio-page ${compact ? "compact-portfolio" : ""}`}>
       <div className="portfolio-overview" aria-label="Resumo da carteira">
@@ -198,8 +202,12 @@ export function ClientPortfolio({
             ))}
         </select>
       </div>
+      <nav className="modality-tabs" aria-label="Carteiras por modalidade">
+        {modalityGroups.map((group) => <button key={group} aria-pressed={modality === group} onClick={() => { setModality(group); setProduct("Todos"); }}>{group}<b>{index.filter((r) => matchesModality(r, group)).length}</b></button>)}
+      </nav>
+      <p className="portfolio-help">Altere a etapa ou a modalidade diretamente na linha. Clique no nome do cliente para acompanhar suas instituições. Um cliente pode participar de mais de uma modalidade.</p>
       <div className="portfolio-view-tools">
-        <div><ListFilter size={15} /><select aria-label="Produto da carteira" value={product} onChange={(e) => setProduct(e.target.value)}><option value="Todos">Todos os produtos</option>{[...new Set(state.operations.map((o) => o.product))].sort().map((p) => <option key={p}>{p}</option>)}</select>
+        <div><ListFilter size={15} /><select aria-label="Produto da carteira" value={product} onChange={(e) => setProduct(e.target.value)}><option value="Todos">Todos os produtos</option>{products.map((p) => <option key={p}>{p}</option>)}</select>
           <select aria-label="Filtrar por prazo" value={attention} onChange={(e) => setAttention(e.target.value as Attention)}><option value="all">Todos os prazos</option><option value="late">Retornos vencidos</option><option value="today">Retorno hoje</option><option value="unscheduled">Sem prazo definido</option></select>
           {filtered && <button onClick={reset}>Limpar filtros</button>}
         </div>
@@ -210,7 +218,7 @@ export function ClientPortfolio({
       <div className="module-card portfolio" id="portfolio-list">
         <div className="portfolio-head">
           <span>EMPRESA / CLIENTE</span>
-          <span>ETAPA</span>
+          <span>ETAPA / MODALIDADE</span>
           <span>DEMANDA / FATURAMENTO</span>
           <span>PRÓXIMO PASSO</span>
           <span>RESPONSÁVEL</span>
@@ -221,14 +229,12 @@ export function ClientPortfolio({
             profile = findRecord(records, "profile", op.id);
           return (
             <React.Fragment key={op.id}>
-              <button
+              <div
                 className={
                   "portfolio-row " + (expanded === op.id ? "open" : "")
                 }
-                aria-expanded={expanded === op.id}
-                onClick={() => setExpanded(expanded === op.id ? null : op.id)}
               >
-                <span className="client-title">
+                <button className="client-title client-toggle" aria-expanded={expanded === op.id} aria-label={`Instituições de ${op.company}`} onClick={() => setExpanded(expanded === op.id ? null : op.id)}>
                   {expanded === op.id ? (
                     <ChevronDown size={17} />
                   ) : (
@@ -241,14 +247,10 @@ export function ClientPortfolio({
                       instituições
                     </small>
                   </span>
-                </span>
-                <span data-label="Etapa">
-                  <b
-                    className={`pill status-${stageTone(op.stage)}`}
-                  >
-                    {op.stage}
-                  </b>
-                </span>
+                </button>
+                <div data-label="Etapa">
+                  <InlineOperationControls op={op} repo={repo} canEdit={canEdit} notify={notify} />
+                </div>
                 <span data-label="Demanda">
                   {money(op.requestedCents)}
                   <small>Faturamento: {money(op.revenueCents)}</small>
@@ -258,7 +260,7 @@ export function ClientPortfolio({
                   <small className={entry.late ? "due-overdue" : ""}>{entry.nextDue ? <><Clock3 size={11} /> {displayDate(entry.nextDue)}{entry.late ? " · vencido" : ""}{entry.nextDue !== op.dueDate ? " · instituição" : ""}</> : isWorking(op) ? "Sem prazo definido" : "Sem retorno agendado"}</small>
                 </span>
                 <span className="portfolio-owner" data-label="Responsável"><i>{op.owner?.slice(0, 1) || "—"}</i>{op.owner}</span>
-              </button>
+              </div>
               {expanded === op.id && (
                 <div className="client-expanded">
                   <div className="module-actions">
@@ -425,6 +427,7 @@ function InstitutionList({
                     {d.product || "Não informada"}
                     <small>Solicitado: {money(d.requestedCents)}</small>
                     <small>Aprovado: {money(d.approvedCents)}</small>
+                    <DealSummary deal={d.deal} requested={d.requestedCents} approved={d.approvedCents} />
                   </td>
                   <td className="notes-cell">
                     <div>{d.notes || "Sem interação registrada"}</div>
@@ -494,11 +497,12 @@ function RecordEditor({
               notes: "",
               nextAction: "",
               dueDate: "",
-              active: true,
+              active: false,
             }),
     ),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [deal, setDeal] = useState(() => dealDraft(record?.data.deal));
   const banks = (state.directory?.records ?? []).filter(
       (r) => r.kind === "bank" && !r.archived,
     ) as Bank[],
@@ -548,6 +552,7 @@ function RecordEditor({
                       ...data,
                       requestedCents: parseMoney(requested),
                       approvedCents: parseMoney(approved),
+                      deal: readDeal(deal),
                     }
                   : data,
                 record?.id ??
@@ -706,6 +711,7 @@ function RecordEditor({
                   />
                 </label>
               </div>
+              <DealFields value={deal} onChange={setDeal} />
               <label>
                 Interações / pendências
                 <textarea

@@ -634,6 +634,7 @@ function App() {
                               (k) =>
                                 ({
                                   stage: "etapa",
+                                  product: "modalidade",
                                   nextAction: "próxima ação",
                                   dueDate: "prazo",
                                   requestedCents: "valor solicitado",
@@ -740,7 +741,7 @@ function App() {
             <span>
               LR CAPITAL <i /> Gestão de operações
             </span>
-            <span>Nova versão · 0.4</span>
+            <span>Nova versão · 0.5</span>
           </footer>
         </main>
       </div>

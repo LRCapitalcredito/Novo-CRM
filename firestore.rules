@@ -9,7 +9,7 @@ service cloud.firestore {
       function admin() { return active() && member().role == 'admin'; }
       function text(v,max) { return v is string && v.size() <= max; }
       function money(v) { return v == null || (v is int && v >= 0 && v <= 1000000000000000); }
-      function summary(v) { return {'company':v.company,'stage':v.stage,'requestedCents':v.requestedCents,'approvedCents':v.approvedCents,'nextAction':v.nextAction,'dueDate':v.dueDate,'version':v.version}; }
+      function summary(v) { return {'company':v.company,'stage':v.stage,'product':v.product,'requestedCents':v.requestedCents,'approvedCents':v.approvedCents,'nextAction':v.nextAction,'dueDate':v.dueDate,'version':v.version}; }
       function validOperation(v,id) {
         return v.keys().hasAll(['id','company','cnpj','contact','email','phone','product','stage','owner','requestedCents','approvedCents','revenueCents','nextAction','dueDate','institution','notes','version','createdAt','updatedAt','updatedBy','lastEventId'])
           && v.keys().hasOnly(['id','company','cnpj','contact','email','phone','product','stage','owner','requestedCents','approvedCents','revenueCents','nextAction','dueDate','institution','notes','version','createdAt','updatedAt','updatedBy','lastEventId'])
@@ -17,8 +17,8 @@ service cloud.firestore {
           && text(v.company,160) && v.company.size()>0
           && text(v.owner,100) && v.owner.size()>0
           && text(v.cnpj,18) && text(v.contact,120) && text(v.email,180) && text(v.phone,40)
-          && v.product in ["Capital de giro", "Antecipação de recebíveis", "Home equity", "Financiamento", "Não informado"]
-          && v.stage in ["Novo", "Documentação", "Análise", "Mesa de crédito", "Aprovado", "Liberado", "Retomada", "Questionário", "Contrato Assinado", "Pagamento Recebido", "Captação de Documentos", "Triagem e Validação", "Diagnóstico Estratégico", "Análise Bancos", "Mesa de Crédito", "Aprovado / Negado", "Assinatura Banco", "Crédito na Conta", "Parado", "Perdido", "Sem Interesse", "Novo Cliente", "Reunião Agendada", "Reunião Realizada", "Aguardando Assinatura", "Enviar E-mail", "E-mail Enviado", "WhatsApp Enviado", "Apresentar para o gerente", "No Show", "Contrato", "Lead", "sem_restricao", "com_restricao"]
+          && v.product in ["Capital de giro", "Antecipação de recebíveis", "Home equity", "Financiamento", "Crédito estruturado", "Reestruturação de dívida", "Crédito rural", "Outras modalidades", "Não informado"]
+          && v.stage in ["Novo", "Documentação", "Análise", "Mesa de crédito", "Aprovado", "Liberado", "Retomada", "Questionário", "Contrato Assinado", "Pagamento Recebido", "Captação de Documentos", "Triagem e Validação", "Diagnóstico Estratégico", "Análise Bancos", "Mesa de Crédito", "Aprovado / Negado", "Assinatura Banco", "Crédito na Conta", "Parado", "Perdido", "Sem Interesse", "Novo Cliente", "Reunião Agendada", "Reunião Realizada", "Aguardando Assinatura", "Enviar E-mail", "E-mail Enviado", "WhatsApp Enviado", "Apresentar para o gerente", "No Show", "Contrato", "Lead", "sem_restricao", "com_restricao", "Negado"]
           && money(v.requestedCents) && money(v.approvedCents) && money(v.revenueCents)
           && text(v.nextAction,12000) && text(v.dueDate,10) && (v.dueDate == '' || v.dueDate.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'))
           && text(v.institution,160) && text(v.notes,12000)

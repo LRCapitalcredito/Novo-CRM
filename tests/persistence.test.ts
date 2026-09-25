@@ -3,8 +3,15 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createPreviewStore } from "../server/preview";
+import { createPreviewStore, allowedPreviewRequest } from "../server/preview";
 import { sampleOperations } from "../src/sample";
+test("prévia aceita somente localhost na porta configurada e bloqueia origem externa", () => {
+  assert.equal(allowedPreviewRequest("127.0.0.1:5175", "http://127.0.0.1:5175", 5175), true);
+  assert.equal(allowedPreviewRequest("localhost:5174", undefined, 5174), true);
+  assert.equal(allowedPreviewRequest("127.0.0.1:5174", undefined, 5175), false);
+  assert.equal(allowedPreviewRequest("127.0.0.1:5175", "https://externo.example", 5175), false);
+  assert.equal(allowedPreviewRequest("externo.example:5175", undefined, 5175), false);
+});
 test("gravação é persistente e auditada após reabrir o banco", () => {
   const dir = mkdtempSync(join(tmpdir(), "lr-v2-test-"));
   try {

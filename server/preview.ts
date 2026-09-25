@@ -123,6 +123,9 @@ async function readBody(req: IncomingMessage) {
   return JSON.parse(body);
 }
 
+export function allowedPreviewRequest(host: string, origin: string | undefined, port: number) {
+  return [`127.0.0.1:${port}`, `localhost:${port}`].includes(host) && (!origin || origin === `http://${host}`);
+}
 export function previewPlugin(): Plugin {
   return {
     name: "lr-local-preview",
@@ -149,10 +152,9 @@ export function previewPlugin(): Plugin {
       server.middlewares.use("/__preview", async (req, res, next) => {
         const origin = req.headers.origin;
         const host = req.headers.host || "";
-        if (
-          !/^(127\.0\.0\.1|localhost):5174$/.test(host) ||
-          (origin && origin !== `http://${host}`)
-        ) {
+        const address = server.httpServer?.address();
+        const port = address && typeof address === "object" ? address.port : server.config.server.port;
+        if (!port || !allowedPreviewRequest(host, origin, port)) {
           res.statusCode = 403;
           res.end("Forbidden");
           return;

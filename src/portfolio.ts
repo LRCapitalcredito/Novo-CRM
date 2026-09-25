@@ -4,6 +4,16 @@ import { isInactive, type WorkspaceRecord } from "./records";
 export const normalizeSearch = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
 export const isWorking = (op: Operation) => !isInactive(op.stage) && !["Liberado", "Crédito na Conta"].includes(op.stage);
 export type Attention = "all" | "late" | "today" | "unscheduled";
+export const modalityGroups = ["Todas as modalidades", "Captação de crédito", "Antecipação de recebíveis", "Home equity", "Outras possibilidades", "A classificar"] as const;
+export type ModalityGroup = (typeof modalityGroups)[number];
+export function matchesModality(row: PortfolioEntry, group: ModalityGroup) {
+  const values = [row.operation.product, ...row.links.map((r) => r.data.deal?.modality)].filter((p) => p && p !== "Não informado");
+  if (group === "Todas as modalidades") return true;
+  if (group === "A classificar") return values.length === 0;
+  if (group === "Captação de crédito") return values.some((p) => ["Capital de giro", "Crédito estruturado", "Financiamento", "Crédito rural"].includes(p));
+  if (group === "Outras possibilidades") return values.some((p) => ["Reestruturação de dívida", "Outras modalidades"].includes(p));
+  return values.includes(group);
+}
 export function portfolioIndex(state: WorkspaceState, date = today()) {
   const placements = new Map<string, WorkspaceRecord[]>();
   for (const record of state.records ?? []) {

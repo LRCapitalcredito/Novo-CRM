@@ -30,7 +30,6 @@ export function TeamCover({ onRoutine }: { onRoutine: () => void }) {
     <section className={`team-cover ${collapsed ? "is-collapsed" : ""}`} aria-label="Apresentação da LR Capital">
       <div className="cover-topline">
         <div className="cover-identity">
-          <span className="cover-logo"><img src="/brand/lr-capital-oficial.png" alt="LR Capital" width="738" height="640" /></span>
           <div><span>LR CAPITAL</span><small>ESTRATÉGIA FINANCEIRA EMPRESARIAL</small></div>
         </div>
         <div className="cover-controls">

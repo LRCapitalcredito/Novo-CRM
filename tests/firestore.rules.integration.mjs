@@ -40,6 +40,7 @@ const base = {
 const summary = (v) => ({
   company: v.company,
   stage: v.stage,
+  product: v.product,
   requestedCents: v.requestedCents,
   approvedCents: v.approvedCents,
   nextAction: v.nextAction,
@@ -354,6 +355,15 @@ async function writeRecord(
     });
   return batch.commit();
 }
+test("novas modalidades e status são auditados; leitor e evento adulterado são recusados", async () => {
+  const db = dbFor();
+  await assertSucceeds(writeOperation(db, { patch: { product: "Crédito estruturado", stage: "Aguardando Assinatura" } }));
+  const previous = (await getDoc(doc(db, path))).data();
+  await assertFails(writeOperation(dbFor("reader"), { previous, patch: { stage: "Contrato Assinado" } }));
+  await assertFails(writeOperation(db, { previous, patch: { product: "Produto inexistente" } }));
+  await assertFails(writeOperation(db, { previous, patch: { product: "Crédito rural" }, eventPatch: { after: { ...summary(base), product: "Capital de giro", version: 2 } } }));
+  await assertSucceeds(writeOperation(db, { previous, patch: { product: "Reestruturação de dívida", stage: "Negado" } }));
+});
 test("contratos e diagnósticos exigem vínculo, versão e histórico atômico", async () => {
   const db = dbFor();
   await writeOperation(db);

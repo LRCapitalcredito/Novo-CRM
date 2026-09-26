@@ -27,9 +27,10 @@ export function TeamCover({ onRoutine }: { onRoutine: () => void }) {
     return !value;
   });
   return <>
-    <section className={`team-cover ${collapsed ? "is-collapsed" : ""}`} aria-label="Apresentação da LR Capital">
+    <section className={`team-cover editorial-cover ${collapsed ? "is-collapsed" : ""}`} aria-label="Apresentação da LR Capital">
       <div className="cover-topline">
         <div className="cover-identity">
+          <span className="cover-logo"><img src="/brand/lr-capital-oficial.png" alt="Logo LR Capital" width="52" height="44" /></span>
           <div><span>LR CAPITAL</span><small>ESTRATÉGIA FINANCEIRA EMPRESARIAL</small></div>
         </div>
         <div className="cover-controls">
@@ -39,22 +40,27 @@ export function TeamCover({ onRoutine }: { onRoutine: () => void }) {
           </button>
         </div>
       </div>
-      <div id="cover-content" className="cover-content" hidden={collapsed}>
-        <div className="cover-message">
-          <span className="cover-kicker">VISÃO INTEGRADA. ATUAÇÃO PRÓXIMA.</span>
-          <h2>Capital, estratégia<br /> e <em>relacionamento.</em></h2>
-          <p>Cada cliente, uma estratégia.<br /> Cada operação, um próximo passo claro.</p>
-          <button className="cover-cta" onClick={onRoutine}>Organizar minha rotina <ArrowRight size={16} /></button>
+      <div id="cover-content" hidden={collapsed}>
+        <div className="editorial-layout">
+          <div className="editorial-message">
+            <span className="editorial-kicker">VISÃO INTEGRADA. ATUAÇÃO PRÓXIMA.</span>
+            <h2>Capital, estratégia<br /> e <em>relacionamento.</em></h2>
+            <p>Cada cliente, uma estratégia.<br /> Cada operação, um próximo passo claro.</p>
+            <button className="cover-cta" onClick={onRoutine}>Organizar minha rotina <ArrowRight size={16} /></button>
+          </div>
+          <div className="editorial-photo">
+            <img src="/brand/parceria-editorial.webp" alt="Cena ilustrativa de uma parceria empresarial, em um escritório ao pôr do sol" width="1536" height="1024" fetchPriority="high" />
+          </div>
         </div>
-        <div className="cover-leadership">
-          <div className="cover-portraits">
-            {partners.map((p, i) => <button key={p.name} onClick={() => setPanel(i)} aria-label={`Conhecer ${p.name}`} className="partner-portrait">
-              <img src={`/brand/${p.photo}`} alt={p.name} style={{ objectPosition: p.position }} width="900" height="1200" />
-              <span className="portrait-caption"><strong>{p.short}</strong><small>{p.role}</small></span>
-              <span className="portrait-open"><ArrowUpRight size={15} /></span>
+        <div className="editorial-team">
+          <p>Três trajetórias.<br /><strong>Uma visão compartilhada.</strong></p>
+          <div className="editorial-partners">
+            {partners.map((p, i) => <button key={p.name} onClick={() => setPanel(i)} aria-label={`Conhecer ${p.name}`} className="editorial-partner">
+              <img src={`/brand/${p.photo}`} alt="" style={{ objectPosition: p.position }} width="48" height="56" />
+              <span><strong>{p.short}</strong><small>{p.role}</small></span>
+              <ArrowUpRight size={15} aria-hidden="true" />
             </button>)}
           </div>
-          <span className="cover-signature">Três trajetórias. Uma visão compartilhada.</span>
         </div>
       </div>
     </section>

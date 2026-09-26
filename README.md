@@ -1,6 +1,6 @@
 # LR Capital · Novo CRM
 
-Versão 0.10: carteira, atuação por instituição, bancos, gerentes, contratos, simulador, diagnóstico financeiro e acompanhamento documental. React + TypeScript; prévia independente com SQLite; ambiente compartilhado com Firebase. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
+Versão 0.11: carteira, atuação por instituição, bancos, gerentes, contratos, simulador, diagnóstico financeiro e acompanhamento documental. React + TypeScript; prévia independente com SQLite; ambiente compartilhado com Firebase. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
 
 Ambiente de validação: https://lr-capital-crm-v2-2026.web.app — login Google e autorização por membro da equipe. Consulte [PUBLICAR.md](PUBLICAR.md) para atualizações. O sistema anterior permanece independente.
 
@@ -47,6 +47,7 @@ No Firebase, os cadastros, links, tarefas e registros de envio usam a sincroniza
 
 ### Visualização e rotina
 
+- Identidade em grafite, dourado e superfícies claras. Capa com fotografia ilustrativa separada dos textos; nomes e cargos ficam ao lado ou abaixo dos retratos. Fotografia gerada por IA, otimizada em WebP; [origem e prompt](docs/visual-identity.md).
 - Logo oficial no acesso, menu e ícone do navegador. Retratos de Ricardo Reis, Lucas Macedo e Giovani Moura de Souza reaproveitados dos materiais do site fornecidos pelo usuário; apresentação conferida em https://www.lrcapitalcredito.com/.
 - Capa recolhível e apresentação institucional com perfis dos sócios, navegação por teclado e respeito à preferência por movimento reduzido.
 - Resumo clicável da carteira, radar de retornos de hoje, vencidos e sem prazo. Considera os prazos explícitos do cliente, dos vínculos ativos e do acompanhamento documental. Cada cliente conta uma vez; cadastros concluídos ou para retomada não aparecem como atrasos da operação corrente. Datas de atualização não são prazos.

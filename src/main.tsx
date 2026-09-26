@@ -64,6 +64,7 @@ import { TeamAccess } from "./TeamAccess";
 import "./refresh.css";
 import { TeamCover } from "./TeamCover";
 import "./experience.css";
+import "./premium.css";
 const DocumentPage = React.lazy(() =>
   import("./DocumentPages").then((m) => ({ default: m.DocumentPage })),
 );
@@ -698,7 +699,7 @@ function App() {
             <span>
               LR CAPITAL <i /> Gestão de operações
             </span>
-            <span>Nova versão · 0.10</span>
+            <span>Nova versão · 0.11</span>
           </footer>
         </main>
       </div>

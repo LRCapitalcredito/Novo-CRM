@@ -35,7 +35,11 @@ export function validateWorkflow(input: RecordInput) {
     if (!documentStatuses.includes(d.status) || !categories.includes(d.category) || !signatureChecks.includes(d.signatureCheck) || typeof d.required !== "boolean" || typeof d.archived !== "boolean") throw new Error("Situação documental inválida.");
     if (!safeDocumentUrl(d.sourceUrl)) throw new Error("Use um link HTTPS válido, sem senha na URL.");
     if (!Array.isArray(d.files) || d.files.length > 30 || d.files.some((f: any) => !/^[-\w]{6,100}$/.test(f.id) || typeof f.name !== "string" || f.name.length > 180 || !Number.isInteger(f.size) || f.size < 1 || f.size > 10485760 || !/^[a-f0-9]{64}$/.test(f.sha256) || typeof f.mime !== "string" || typeof f.uploadedAt !== "string")) throw new Error("Versão de arquivo inválida.");
-    if (["Recebido", "Em conferência", "Conferido"].includes(d.status) && !d.files.length && !d.sourceUrl) throw new Error("Anexe o arquivo ou informe onde ele está guardado.");
+    if(d.receiptLocation!==undefined)text("receiptLocation",500);
+    if(d.receivedBy!==undefined)text("receivedBy",200);
+    if(d.receivedOn!==undefined) {date("receivedOn");if(d.receivedOn>today())throw Error("O recebimento não pode estar no futuro.");}
+    const receiptNote=typeof d.receiptLocation==="string"&&d.receiptLocation.trim().length>=3&&d.receivedBy?.trim()&&d.receivedOn;
+    if (["Recebido", "Em conferência", "Conferido"].includes(d.status) && !d.files.length && !d.sourceUrl && !(d.status!=="Conferido"&&receiptNote)) throw new Error("Anexe o arquivo, informe o link ou registre onde recebeu o documento.");
     if (["Conferido", "A corrigir", "Dispensado"].includes(d.status) && !d.reviewNotes.trim()) throw new Error("Registre o resultado da conferência ou a justificativa.");
     if (d.status === "Conferido" && d.expiresOn && d.expiresOn < today()) throw new Error("O documento está vencido. Solicite uma atualização.");
     if (d.signatureCheck === "Validação externa registrada" && !d.reviewNotes.trim()) throw new Error("Registre a ferramenta, a data e a evidência da validação.");

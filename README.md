@@ -143,3 +143,12 @@ Siga [PUBLICAR.md](PUBLICAR.md). `firebase.validation.json` aponta ao projeto no
 | Firebase e permissões   | `src/firebaseRepository.ts`, `firestore.rules` |
 
 O leitor local usa [PDF.js](https://mozilla.github.io/pdf.js/examples/).
+## Version 0.9 — equipe, documentos e Drive
+
+- Administradores cadastram convites por e-mail em Usuários e conexão. O primeiro acesso exige Google com e-mail verificado correspondente ao convite; resgate atômico cria o membro uma única vez. Permissões de edição/consulta, revogação de convite e desativação de membro. Administradores existentes não podem ser desativados pela interface.
+- Catálogo de pastas em `driveFolders`, privado para os membros do workspace, com busca, seleção e link manual. O vínculo não altera o compartilhamento no Google Drive. Prévia opcional: `LR_DRIVE_FOLDERS` aponta para um catálogo JSON privado fora do repositório.
+- Revisão antes de preparar WhatsApp/e-mail: recebimentos persistidos com local, responsável e data; seleção dos itens a solicitar; nova confirmação quando os dados mudam. Recebido não significa conferido. Documentos vencidos exigem revisão da versão no acompanhamento.
+- Checklist de documentos importados reconhece identificadores e exercícios do sistema original sem inferir o período pela data de upload. Mantém períodos ausentes como pendentes.
+- Lateral com gradiente, movimento suave e suporte a redução de movimento. Removido o atalho Base recebida; a base de origem é preservada.
+
+Os cadastros reais, arquivos de conciliação, contatos e catálogo de pastas ficam fora deste repositório público. O cadastro comercial importado preserva sua origem e não representa aprovação de crédito ou confirmação de uma política oficial da instituição.

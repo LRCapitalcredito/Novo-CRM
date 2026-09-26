@@ -60,6 +60,8 @@ import { DirectoryPage, ComparisonPage } from "./DirectoryPages";
 import { emptyDirectory } from "./directory";
 
 import { ClientPortfolio } from "./ClientPortfolio";
+import { TeamAccess } from "./TeamAccess";
+import "./refresh.css";
 import { TeamCover } from "./TeamCover";
 import "./experience.css";
 const DocumentPage = React.lazy(() =>
@@ -99,7 +101,6 @@ const navigation = [
   { id: "history", label: "Atividades", icon: History },
   { id: "banks", label: "Bancos e instituições", icon: Building2 },
   { id: "managers", label: "Gerentes", icon: Users },
-  { id: "comparison", label: "Base recebida", icon: FileText },
 ] as const;
 const stageClass = (stage: string) =>
   `stage stage-${stages.indexOf(stage as any)}`;
@@ -313,7 +314,7 @@ function App() {
             onClick={() => navigate("settings")}
           >
             <Settings2 size={18} />
-            <span>Conexão e acesso</span>
+            <span>Usuários e conexão</span>
           </button>
           <div className="profile">
             <span className="avatar gold">{initials(session.name)}</span>
@@ -632,6 +633,7 @@ function App() {
                 title="Conexão e acesso"
                 description="Veja onde os dados estão e como a equipe acessa o sistema."
               />
+              {session.role === "admin" && <TeamAccess repo={repo} notify={setNotice}/>}
               <div className="settings-grid">
                 <section className="surface">
                   <span className="setting-symbol">
@@ -696,7 +698,7 @@ function App() {
             <span>
               LR CAPITAL <i /> Gestão de operações
             </span>
-            <span>Nova versão · 0.8</span>
+            <span>Nova versão · 0.9</span>
           </footer>
         </main>
       </div>

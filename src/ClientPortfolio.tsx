@@ -260,7 +260,7 @@ export function ClientPortfolio({
                     <small>{minimumChecklist(op,records).complete?"✓ Mínimo documental conferido":"○ Mínimo documental: "+minimumChecklist(op,records).done+"/"+minimumChecklist(op,records).total} · {documents.filter((r)=>pendingDocument(r)).length} pendências registradas</small>
                   </span>
                 </button>
-                <CopyCnpj cnpj={op.cnpj} notify={notify}/><ContactButtons op={op} records={records} notify={notify}/><DriveActions op={op} state={state} repo={repo} canEdit={canEdit} notify={notify}/></div>
+                <CopyCnpj cnpj={op.cnpj} notify={notify}/><ContactButtons op={op} records={records} repo={repo} canEdit={canEdit} notify={notify}/><DriveActions op={op} state={state} repo={repo} canEdit={canEdit} notify={notify}/></div>
                 <div data-label="Etapa">
                   <InlineOperationControls op={op} repo={repo} canEdit={canEdit} notify={notify} />
                   <ClientClassification op={op} state={state} repo={repo} canEdit={canEdit} notify={notify}/>

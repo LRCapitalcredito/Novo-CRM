@@ -2,6 +2,7 @@ import { today, type Operation } from "./domain";
 import { whatsappUrl } from "./directory";
 import { documentChecklist, expiredDocument, newDocument, pendingDocument, readyDocument } from "./workflow";
 import type { WorkspaceRecord } from "./records";
+import {legacyMinimumChecklist,legacyTemplateKey} from "./legacyChecklist";
 
 export const clientTracks = ["Captação de crédito", "Antecipação de recebíveis", "Home equity", "Outras possibilidades"] as const;
 export const restrictionOptions = ["A verificar", "Sem restrições", "Com restrições"] as const;
@@ -18,10 +19,11 @@ export function activeTracks(op:Operation, records:WorkspaceRecord[]) {
 }
 export function minimumChecklist(op:Operation, records:WorkspaceRecord[]) {
   const tracks=activeTracks(op,records), products=tracks.length?tracks:[op.product];
-  const suggestions=[...new Map(products.flatMap(p=>documentChecklist(p)).map(s=>[s.key,s])).values()];
   const documents=records.filter(r=>r.operationId===op.id&&r.kind==="document"&&!r.data.archived);
+  const legacy=documents.some(r=>r.data.legacyDocumentId);
+  const suggestions=[...new Map(products.flatMap(p=>legacy?[...legacyMinimumChecklist(),...documentChecklist(p).slice(6)]:documentChecklist(p)).map(s=>[s.key,s])).values()];
   const items=suggestions.map(s=>{
-    const linked=documents.filter(d=>d.data.templateKey===s.key);
+    const linked=documents.filter(d=>d.data.templateKey===s.key||(legacy&&d.data.legacyDocumentId&&s.key===`legacy-${legacyTemplateKey(d.data.legacyTemplateId||"")}`));
     const complete=linked.some(d=>readyDocument(d)||d.data.status==="Dispensado"&&d.data.reviewNotes?.trim());
     return {...s,linked,complete};
   });

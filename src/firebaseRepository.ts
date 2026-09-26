@@ -10,6 +10,7 @@ import {
 } from "firebase/auth";
 import {
   getFirestore,
+  getDocs,
   doc,
   collection,
   onSnapshot,
@@ -20,6 +21,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import type { Repository } from "./repository";
+import {invitationInput, type TeamState} from "./team";
 import { assertPlacementFit, needsFitCheck } from "./institutionFit";
 import type { Bank, Manager } from "./directory";
 import { isWorkflowKind, validateWorkflowLinks } from "./workflow";
@@ -62,6 +64,36 @@ export function firebaseRepository(config: Config): Repository {
   const repo: Repository = {
     mode: "firebase",
     passwordLoginEnabled: config.passwordLoginEnabled !== false,
+    async listDriveFolders() {
+      const result=await getDocs(collection(db,root,"driveFolders"));
+      return result.docs.map(d=>({name:d.data().name as string,url:d.data().url as string}));
+    },
+    subscribeTeam(next,error) {
+      let state:TeamState={members:[],invitations:[]};
+      const fail=()=>error("Não foi possível carregar os acessos da equipe.");
+      const a=onSnapshot(collection(db,root,"members"),snap=>{state={...state,members:snap.docs.map(d=>({...d.data(),uid:d.id} as TeamState["members"][number]))};next(state);},fail);
+      const b=onSnapshot(collection(db,root,"invitations"),snap=>{state={...state,invitations:snap.docs.map(d=>d.data() as TeamState["invitations"][number])};next(state);},fail);
+      return ()=>{a();b();};
+    },
+    async saveInvitation(raw,expectedVersion) {
+      if(repo.session?.role!=="admin")throw Error("Somente o administrador pode cadastrar acessos.");
+      const input=invitationInput(raw.email,raw.name,raw.role),target=doc(db,root,"invitations",input.email);
+      await runTransaction(db,async tx=>{
+        const current=await tx.get(target),old=current.data();
+        if((old?.version??null)!==expectedVersion)throw Error("O convite mudou. Confira a lista e tente novamente.");
+        if(old?.claimedUid)throw Error("Convite já utilizado. Altere o usuário na lista da equipe.");
+        tx.set(target,{...input,active:raw.active,claimedUid:"",version:(old?.version??0)+1,createdAt:old?.createdAt??serverTimestamp(),updatedAt:serverTimestamp(),updatedBy:repo.session!.uid});
+      });
+    },
+    async changeMemberAccess(member,active,role) {
+      if(repo.session?.role!=="admin"||member.uid===repo.session.uid||member.role==="admin")throw Error("Este acesso de administrador deve ser preservado.");
+      if(!["editor","reader"].includes(role))throw Error("Permissão inválida.");
+      await runTransaction(db,async tx=>{
+        const target=doc(db,root,"members",member.uid),current=await tx.get(target),old=current.data();
+        if(!old||old.active!==member.active||old.role!==member.role)throw Error("O acesso mudou. Confira a lista e tente novamente.");
+        tx.update(target,{active,role});
+      });
+    },
     async saveRecord(raw, expectedVersion) {
       if (!auth.currentUser || !repo.session || repo.session.role === "reader")
         throw new Error("Sem permissão para alterar.");
@@ -151,13 +183,31 @@ export function firebaseRepository(config: Config): Repository {
     session: null,
     authListener(callback) {
       getRedirectResult(auth).catch(() => callback(null, "O acesso Google não foi concluído. Tente novamente com a conta habilitada."));
-      const unsub = onAuthStateChanged(auth, (user) => {
+      let generation=0;
+      const unsub = onAuthStateChanged(auth, async (user) => {
+        const currentGeneration=++generation;
         membershipUnsub?.();
         repo.session = null;
         if (!user) {
           callback(null);
           return;
         }
+        // An invitation can be claimed once, only by its verified Google identity.
+        try {
+          await runTransaction(db,async tx=>{
+            const target=doc(db,root,"members",user.uid),existing=await tx.get(target);
+            if(existing.exists()||!user.email||!user.emailVerified||!user.providerData.some(p=>p.providerId==="google.com"))return;
+            const inviteRef=doc(db,root,"invitations",user.email.toLowerCase()),invite=await tx.get(inviteRef),data=invite.data();
+            if(!data?.active||data.claimedUid)return;
+            tx.set(target,{name:data.name,email:data.email,role:data.role,active:true});
+            tx.update(inviteRef,{claimedUid:user.uid,version:data.version+1,updatedAt:serverTimestamp(),updatedBy:user.uid});
+          });
+        } catch {
+          if(currentGeneration!==generation)return;
+          callback(null,"Não foi possível ativar seu convite. Confira com o administrador o e-mail da conta Google.");
+          return;
+        }
+        if(currentGeneration!==generation)return;
         membershipUnsub = onSnapshot(
           doc(db, root, "members", user.uid),
           (snap) => {
@@ -189,6 +239,7 @@ export function firebaseRepository(config: Config): Repository {
         );
       });
       return () => {
+        generation++;
         unsub();
         membershipUnsub?.();
       };

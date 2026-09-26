@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -167,6 +167,9 @@ export function previewPlugin(): Plugin {
           res.end(JSON.stringify(data));
         };
         try {
+          if(req.url==="/drive-folders"&&req.method==="GET") {
+            respond(200,process.env.LR_DRIVE_FOLDERS?JSON.parse(readFileSync(process.env.LR_DRIVE_FOLDERS,"utf8")):[]);return;
+          }
           const uploadId = req.url?.match(/^\/document-files\/([-\w]{6,100})$/)?.[1];
           if (uploadId && req.method === "POST") {
             const chunks: Buffer[] = []; let size = 0;

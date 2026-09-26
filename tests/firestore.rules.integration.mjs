@@ -523,3 +523,64 @@ test("conta desativada perde acesso e os dados de outro workspace ficam isolados
     ),
   );
 });
+
+const googleDb=(uid,email,verified=true,provider='google.com')=>env.authenticatedContext(uid,{email,email_verified:verified,firebase:{sign_in_provider:provider}}).firestore();
+const invitation=(email='partner@example.test',patch={})=>({email,name:'Sócio teste',role:'editor',active:true,claimedUid:'',version:1,createdAt:serverTimestamp(),updatedAt:serverTimestamp(),updatedBy:'admin',...patch});
+async function invite(email='partner@example.test',patch={}){return setDoc(doc(dbFor('admin'),`${root}/invitations/${email}`),invitation(email,patch));}
+function claim(db,uid,email='partner@example.test',patch={}){const batch=writeBatch(db);batch.set(doc(db,`${root}/members/${uid}`),{name:'Sócio teste',email,role:'editor',active:true,...patch});batch.update(doc(db,`${root}/invitations/${email}`),{claimedUid:uid,version:2,updatedAt:serverTimestamp(),updatedBy:uid});return batch.commit();}
+test('somente administrador cadastra convites, sem conceder administração',async()=>{
+ await assertFails(setDoc(doc(dbFor('editor'),`${root}/invitations/partner@example.test`),invitation()));
+ await assertFails(invite('partner@example.test',{role:'admin'}));
+ await assertSucceeds(invite());
+});
+test('Google verificado resgata convite atomicamente e passa a consultar a carteira',async()=>{
+ await invite();const db=googleDb('partner','partner@example.test');
+ await assertSucceeds(getDoc(doc(db,`${root}/invitations/partner@example.test`)));
+ await assertSucceeds(claim(db,'partner'));
+ await assertSucceeds(getDoc(doc(db,path)));
+ await assertFails(claim(googleDb('duplicate','partner@example.test'),'duplicate'));
+});
+test('convites não permitem outro email, email não verificado, senha ou elevação de privilégio',async()=>{
+ await invite();
+ await assertFails(claim(googleDb('wrong','other@example.test'),'wrong'));
+ await assertFails(claim(googleDb('unverified','partner@example.test',false),'unverified'));
+ await assertFails(claim(googleDb('password','partner@example.test',true,'password'),'password'));
+ await assertFails(claim(googleDb('escalate','partner@example.test'),'escalate','partner@example.test',{role:'admin'}));
+ await assertFails(claim(googleDb('rename','partner@example.test'),'rename','partner@example.test',{name:'Alterado'}));
+});
+test('convite revogado bloqueia primeiro acesso e leitor continua sem edição',async()=>{
+ await invite('partner@example.test',{active:false});
+ await assertFails(claim(googleDb('partner','partner@example.test'),'partner'));
+ await invite('reader@example.test',{role:'reader'});
+ const db=googleDb('new-reader','reader@example.test');
+ await assertSucceeds(claim(db,'new-reader','reader@example.test',{role:'reader'}));
+ await assertFails(writeOperation(db));
+});
+test('resgate exige criação conjunta e não pode roubar ou sobrescrever outro membro',async()=>{
+ await invite();const db=googleDb('partner','partner@example.test');
+ await assertFails(setDoc(doc(db,`${root}/members/partner`),{name:'Sócio teste',email:'partner@example.test',role:'editor',active:true}));
+ await assertFails(updateDoc(doc(db,`${root}/invitations/partner@example.test`),{claimedUid:'partner',version:2,updatedAt:serverTimestamp(),updatedBy:'partner'}));
+ await assertFails(claim(db,'editor'));
+});
+test('administrador desativa membro e convite usado não reativa acesso',async()=>{
+ await invite();const db=googleDb('partner','partner@example.test');await claim(db,'partner');
+ await assertSucceeds(updateDoc(doc(dbFor('admin'),`${root}/members/partner`),{active:false}));
+ await assertFails(getDoc(doc(db,path)));
+ await assertFails(claim(db,'partner'));
+ await assertFails(updateDoc(doc(db,`${root}/members/partner`),{active:true}));
+ await assertSucceeds(updateDoc(doc(dbFor('admin'),`${root}/members/partner`),{active:true,role:'reader'}));
+});
+test('administrador não perde seu próprio acesso e membros não alteram identidade nem viram admin',async()=>{
+ await assertFails(updateDoc(doc(dbFor('admin'),`${root}/members/admin`),{active:false}));
+ await assertFails(updateDoc(doc(dbFor('admin'),`${root}/members/editor`),{role:'admin'}));
+ await assertFails(updateDoc(doc(dbFor('admin'),`${root}/members/editor`),{name:'Outra pessoa'}));
+ await assertSucceeds(updateDoc(doc(dbFor('admin'),`${root}/members/editor`),{role:'reader'}));
+});
+test('catálogo do Drive e convites são privados e isolados por equipe',async()=>{
+ await invite();const stranger=googleDb('stranger','stranger@example.test');
+ await assertFails(getDoc(doc(stranger,`${root}/invitations/partner@example.test`)));
+ await assertFails(getDoc(doc(stranger,`${root}/driveFolders/folder-test`)));
+ await assertSucceeds(getDoc(doc(dbFor('reader'),`${root}/driveFolders/folder-test`)));
+ await assertFails(setDoc(doc(dbFor('editor'),`${root}/driveFolders/folder-test`),{name:'Outro',url:'https://drive.google.com/drive/folders/test'}));
+ await assertFails(getDoc(doc(dbFor('admin'),'lr_v2_workspaces/other/driveFolders/folder-test')));
+});

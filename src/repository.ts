@@ -1,6 +1,10 @@
 import type { OperationInput, Session, WorkspaceState } from "./domain";
 import type { DirectoryInput, ImportSummary, LegacyDataset } from "./directory";
 export interface Repository {
+  listDriveFolders?(): Promise<{name:string;url:string}[]>;
+  subscribeTeam?(next:(state:import("./team").TeamState)=>void,error:(message:string)=>void):()=>void;
+  saveInvitation?(input:{email:string;name:string;role:import("./team").AccessRole;active:boolean},expectedVersion:number|null):Promise<void>;
+  changeMemberAccess?(member:import("./team").TeamMember,active:boolean,role:import("./team").AccessRole):Promise<void>;
   uploadDocument?(recordId: string, expectedVersion: number, file: File): Promise<void>;
   downloadDocument?(file: import("./workflow").DocumentFile): Promise<void>;
   saveRecord(
@@ -52,6 +56,11 @@ export async function createRepository(): Promise<Repository | null> {
   };
   return {
     mode: "preview",
+    async listDriveFolders() {
+      const response=await fetch("/__preview/drive-folders");
+      if(!response.ok)throw Error("Não foi possível carregar as pastas.");
+      return response.json();
+    },
     async uploadDocument(recordId, expectedVersion, file) {
       if (!file.size || file.size > 10485760) throw new Error("Selecione um arquivo de até 10 MB.");
       const response = await fetch(`/__preview/document-files/${encodeURIComponent(recordId)}`, { method: "POST", headers: { "Content-Type": "application/octet-stream", "X-LR-Version": String(expectedVersion), "X-LR-Filename": encodeURIComponent(file.name) }, body: file });

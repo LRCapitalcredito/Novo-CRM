@@ -33,12 +33,53 @@ service cloud.firestore {
       match /members/{uid} {
         allow get: if signedIn() && (request.auth.uid == uid || admin());
         allow list: if admin();
-        allow create, update: if admin()
+        allow create: if claimMember(uid);
+        allow update: if admin() && uid != request.auth.uid && resource.data.role != 'admin'
           && request.resource.data.keys().hasAll(['name','role','active'])
-          && request.resource.data.keys().hasOnly(['name','role','active'])
+          && request.resource.data.keys().hasOnly(['name','role','active','email'])
           && text(request.resource.data.name,100) && request.resource.data.name.size()>0
-          && request.resource.data.role in ['admin','editor','reader'] && request.resource.data.active is bool;
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active','role'])
+          && request.resource.data.role in ['editor','reader'] && request.resource.data.active is bool;
         allow delete: if false;
+      }
+      function googleIdentity(email) {
+        return signedIn() && request.auth.token.email_verified == true
+          && request.auth.token.firebase.sign_in_provider == 'google.com'
+          && request.auth.token.email.lower() == email;
+      }
+      function claimMember(uid) {
+        let m=request.resource.data;
+        let invite=get(/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/invitations/$(m.email)).data;
+        let after=getAfter(/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/invitations/$(m.email)).data;
+        return uid==request.auth.uid && googleIdentity(m.email)
+          && m.keys().hasOnly(['name','email','role','active']) && m.active==true
+          && m.name==invite.name && m.role==invite.role && m.role in ['editor','reader']
+          && invite.active==true && invite.claimedUid=='' && after.claimedUid==uid;
+      }
+      function validInvite(v,email) {
+        return v.keys().hasAll(['email','name','role','active','claimedUid','version','createdAt','updatedAt','updatedBy'])
+          && v.keys().hasOnly(['email','name','role','active','claimedUid','version','createdAt','updatedAt','updatedBy'])
+          && text(v.email,180) && v.email==email && email==email.lower() && email.matches('^[^ @/]+@[^ @/]+[.][^ @/]+$')
+          && text(v.name,100) && v.name.size()>0 && v.role in ['editor','reader'] && v.active is bool
+          && v.claimedUid is string && v.version is int && v.updatedAt==request.time && v.updatedBy==request.auth.uid;
+      }
+      match /invitations/{email} {
+        allow get: if admin() || googleIdentity(email);
+        allow list: if admin();
+        allow create: if admin() && validInvite(request.resource.data,email) && request.resource.data.version==1 && request.resource.data.createdAt==request.time && request.resource.data.claimedUid=='';
+        allow update: if validInvite(request.resource.data,email)
+          && request.resource.data.createdAt==resource.data.createdAt && request.resource.data.version==resource.data.version+1
+          && ((admin() && resource.data.claimedUid=='' && request.resource.data.claimedUid=='')
+            || (googleIdentity(email) && resource.data.active==true && resource.data.claimedUid==''
+              && request.resource.data.claimedUid==request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimedUid','version','updatedAt','updatedBy'])
+              && !exists(/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/members/$(request.auth.uid))
+              && getAfter(/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/members/$(request.auth.uid)).data.email==email));
+        allow delete: if false;
+      }
+      match /driveFolders/{id} {
+        allow read: if active();
+        allow write: if false;
       }
       match /operations/{id} {
         allow get,list: if active();

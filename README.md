@@ -1,6 +1,6 @@
 # LR Capital · Novo CRM
 
-Versão 0.8: carteira, atuação por instituição, bancos, gerentes, contratos, simulador, diagnóstico financeiro e acompanhamento documental. React + TypeScript; prévia independente com SQLite; ambiente compartilhado com Firebase. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
+Versão 0.10: carteira, atuação por instituição, bancos, gerentes, contratos, simulador, diagnóstico financeiro e acompanhamento documental. React + TypeScript; prévia independente com SQLite; ambiente compartilhado com Firebase. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
 
 Ambiente de validação: https://lr-capital-crm-v2-2026.web.app — login Google e autorização por membro da equipe. Consulte [PUBLICAR.md](PUBLICAR.md) para atualizações. O sistema anterior permanece independente.
 
@@ -152,3 +152,10 @@ O leitor local usa [PDF.js](https://mozilla.github.io/pdf.js/examples/).
 - Lateral com gradiente, movimento suave e suporte a redução de movimento. Removido o atalho Base recebida; a base de origem é preservada.
 
 Os cadastros reais, arquivos de conciliação, contatos e catálogo de pastas ficam fora deste repositório público. O cadastro comercial importado preserva sua origem e não representa aprovação de crédito ou confirmação de uma política oficial da instituição.
+
+## Versão 0.10 — formatos e histórico de conversas
+
+- Faturamento mínimo e máximo exibidos em reais, com centavos, inclusive ao abrir e sair dos campos de edição. Telefones brasileiros exibidos com DDD; entradas incompletas são preservadas para correção.
+- Histórico por cliente e instituição: rascunhos, envio informado e respostas registradas manualmente, com data e responsável. Registros são preservados; editores adicionam e leitores consultam.
+- Salvar e abrir WhatsApp/e-mail persiste o rascunho antes de abrir o aplicativo. O usuário confirma o envio; o CRM não presume entrega ou leitura. Respostas podem ser coladas no histórico.
+- A sincronização automática e o envio pela plataforma oficial do WhatsApp ainda não estão conectados. Nenhuma captura de conversas do WhatsApp Web é realizada.

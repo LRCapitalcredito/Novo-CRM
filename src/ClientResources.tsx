@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { celular } from "./brFormats";
+import { SavedMessageActions, ConversationHistory } from "./ConversationHistory";
 import { Copy, FolderOpen, MessageCircle, Link2, Check } from "lucide-react";
 import { Drawer, DirectoryEditor } from "./DirectoryPages";
 import type { Operation, WorkspaceState } from "./domain";
@@ -55,7 +57,7 @@ function ManagerMessage({op, placement, state, repo, canEdit, notify, close}: Pr
   const ready = !!url && !!folder && text.trim().length > 0 && reviewed && base === fingerprint && fit.status !== "conflict";
   return <Drawer title="Enviar pasta ao gerente" close={close}><div className="module-form"><p><strong>{op.company}</strong> → {manager?.name || "Gerente não cadastrado"} · {bank?.name || placement.data.institution}</p><DriveActions op={op} state={state} repo={repo} canEdit={canEdit} notify={notify}/>
     {(!manager || !url) && <p className="module-error">Cadastre o gerente e um celular válido na atuação antes de abrir o WhatsApp.</p>}
-    {manager&&<div className="module-actions"><span>{manager.phone||"Telefone pendente"}</span>{canEdit&&<button type="button" onClick={()=>setEditing(manager)}>Conferir contato do gerente</button>}</div>}
+    {manager&&<div className="module-actions"><span>{celular(manager.phone)||"Telefone pendente"}</span>{canEdit&&<button type="button" onClick={()=>setEditing(manager)}>Conferir contato do gerente</button>}</div>}
     {editing&&<DirectoryEditor record={editing} banks={(state.directory?.records??[]).filter((r):r is Bank=>r.kind==="bank")} events={state.directory?.events??[]} canEdit={canEdit} close={()=>setEditing(null)} save={async input=>{await repo.saveDirectory(input,editing.version);setEditing(null);notify("Contato do gerente atualizado.");}}/>}
     {fit.status !== "compatible" && <div className={`fit-panel ${fit.status}`}><strong>{fit.label}</strong>{fit.issues.map(i => <p key={i.key+i.message}>{i.message}</p>)}{fit.conflicts.length > 0 && <p>Resolva as divergências em “Abrir atuação” antes de encaminhar a pasta.</p>}</div>}
     {base !== fingerprint && <p role="alert">A pasta ou o destinatário mudou. Atualize a mensagem antes de continuar.</p>}
@@ -63,6 +65,8 @@ function ManagerMessage({op, placement, state, repo, canEdit, notify, close}: Pr
     <label>Mensagem para revisar<textarea rows={13} value={text} onChange={e => {setText(e.target.value);setReviewed(false);}}/></label>
     <label className="check-field"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)}/> Revisei a pasta, o destinatário e o acesso do gerente no Drive.</label>
     <p className="module-footnote">A mensagem abre preenchida. O envio é feito por você no WhatsApp e não é registrado automaticamente como concluído.</p>
-    <div className="module-actions"><button disabled={!text.trim()} onClick={async () => {try {await navigator.clipboard.writeText(text);notify("Mensagem copiada.");} catch {notify("Selecione o texto para copiar.");}}}><Copy size={14}/> Copiar mensagem</button>{ready ? <a className="button primary" href={url!} target="_blank" rel="noreferrer">Abrir WhatsApp do gerente ↗</a> : <button className="primary" disabled>Abrir WhatsApp do gerente</button>}</div>
+    <div className="module-actions"><button disabled={!text.trim()} onClick={async () => {try {await navigator.clipboard.writeText(text);notify("Mensagem copiada.");} catch {notify("Selecione o texto para copiar.");}}}><Copy size={14}/> Copiar mensagem</button></div>
+    <SavedMessageActions op={op} repo={repo} canEdit={canEdit} notify={notify} channel="WhatsApp" recipient={manager?.phone||""} recipientName={manager?.name||placement.data.manager||"Gerente"} placementId={placement.id} body={text} ready={ready}/>
+    <ConversationHistory op={op} records={state.records??[]} repo={repo} canEdit={canEdit} notify={notify} channel="WhatsApp" recipient={manager?.phone||""} recipientName={manager?.name||placement.data.manager||"Gerente"} placementId={placement.id}/>
   </div></Drawer>;
 }

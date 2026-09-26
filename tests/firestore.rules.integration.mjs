@@ -395,6 +395,19 @@ test("contratos e diagnósticos exigem vínculo, versão e histórico atômico",
   );
 });
 
+test("histórico de mensagens exige editor e auditoria; não permite alterar ou apagar o original",async()=>{
+  const db=dbFor();await writeOperation(db);
+  const input={id:"message-history-test",kind:"message",contentJson:'{"status":"draft","body":"Mensagem fictícia"}'};
+  await assertSucceeds(writeRecord(db,input));
+  await assertSucceeds(getDoc(doc(dbFor("reader"),`${root}/records/${input.id}`)));
+  await assertFails(writeRecord(dbFor("reader"),{...input,id:"message-reader"}));
+  await assertFails(writeRecord(db,{...input,id:"message-no-audit"},null,{noAudit:true}));
+  const previous=(await getDoc(doc(db,`${root}/records/${input.id}`))).data();
+  await assertFails(writeRecord(db,{...input,contentJson:'{"body":"Changed"}'},previous));
+  await assertFails(deleteDoc(doc(db,`${root}/records/${input.id}`)));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(),`${root}/records/${input.id}`)));
+});
+
 test("documentos, tarefas e envios preservam conteúdo no histórico e respeitam acesso", async () => {
   const db = dbFor();
   await writeOperation(db);

@@ -6,6 +6,7 @@ import { validateClientProfile } from "./clientFlow";
 import { validateWorkflow } from "./workflow";
 import { validateFitProfile } from "./institutionFit";
 import { validateDriveProfile } from "./clientDrive";
+import { validateMessage } from "./conversations";
 export type RecordKind =
   | "profile"
   | "placement"
@@ -15,7 +16,8 @@ export type RecordKind =
   | "simulation"
   | "document"
   | "task"
-  | "dispatch";
+  | "dispatch"
+  | "message";
 export interface WorkspaceRecord {
   id: string;
   kind: RecordKind;
@@ -53,6 +55,7 @@ export function validateRecord(raw: any): RecordInput {
       "document",
       "task",
       "dispatch",
+      "message",
     ].includes(raw.kind) ||
     !/^[-\w]{6,100}$/.test(raw.id) ||
     !(
@@ -100,6 +103,7 @@ export function validateRecord(raw: any): RecordInput {
       throw new Error("Prazo inválido.");
   }
   validateWorkflow(raw);
+  validateMessage(raw);
   const d = raw.data;
   const text = (key: string, max = 4000) => {
     if (typeof d[key] !== "string" || d[key].length > max)

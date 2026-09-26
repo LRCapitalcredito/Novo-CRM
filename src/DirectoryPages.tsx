@@ -15,7 +15,8 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { money, parseMoney } from "./domain";
+import { parseMoney } from "./domain";
+import { reais, reaisInput, formatReaisInput, celular } from "./brFormats";
 import {
   newBank,
   newManager,
@@ -43,8 +44,7 @@ const norm = (s: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
-const amountInput = (v: number | null) =>
-  v === null ? "" : String(v / 100).replace(".", ",");
+const amountInput = reaisInput;
 const optionalNumber = (s: string) =>
   s === "" ? null : Number(s.replace(",", "."));
 const fieldNames: Record<string, string> = {
@@ -436,8 +436,8 @@ export function DirectoryPage({
                       </button>
                       <small>{sourceText(record)}</small>
                     </td>
-                    <td className="numeric">{money(record.minRevenueCents)}</td>
-                    <td className="numeric">{money(record.maxRevenueCents)}</td>
+                    <td className="numeric">{reais(record.minRevenueCents)}</td>
+                    <td className="numeric">{reais(record.maxRevenueCents)}</td>
                     <td>
                       {record.email ? (
                         <a href={`mailto:${record.email}`}>{record.email}</a>
@@ -453,10 +453,10 @@ export function DirectoryPage({
                             target="_blank"
                             rel="noreferrer"
                           >
-                            {record.phone} ↗
+                            {celular(record.phone)} ↗
                           </a>
                         ) : (
-                          record.phone || "WhatsApp não informado"
+                          celular(record.phone) || "WhatsApp não informado"
                         )}
                       </div>
                     </td>
@@ -620,7 +620,7 @@ export function DirectoryEditor({
   save: (r: DirectoryInput) => Promise<void>;
 }) {
   const [form, setForm] = useState<any>(() =>
-      ({...JSON.parse(JSON.stringify(record)), ...(confirmationRequired ? {source:""} : {})}),
+      ({...JSON.parse(JSON.stringify(record)), ...(record.kind === "manager" ? {phone: celular(record.phone)} : {}), ...(confirmationRequired ? {source:""} : {})}),
     ),
     [min, setMin] = useState(
       record.kind === "manager" ? amountInput(record.minRevenueCents) : "",
@@ -902,6 +902,7 @@ export function DirectoryEditor({
                         placeholder="Não informado"
                         value={min}
                         onChange={(e) => setMin(e.target.value)}
+                        onBlur={(e) => setMin(formatReaisInput(e.target.value))}
                       />
                     </label>
                     <label>
@@ -911,6 +912,7 @@ export function DirectoryEditor({
                         placeholder="Não informado"
                         value={max}
                         onChange={(e) => setMax(e.target.value)}
+                        onBlur={(e) => setMax(formatReaisInput(e.target.value))}
                       />
                     </label>
                     <label>
@@ -927,6 +929,8 @@ export function DirectoryEditor({
                         type="tel"
                         value={form.phone}
                         onChange={field("phone")}
+                        onBlur={(e) => set("phone", celular(e.target.value))}
+                        placeholder="(51) 9.9817-4811"
                       />
                     </label>
                     <label>

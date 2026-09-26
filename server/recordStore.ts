@@ -43,6 +43,7 @@ export function createRecordStore(db: DatabaseSync) {
       db.exec("BEGIN IMMEDIATE");
       try {
         const old = get(input.id);
+        if (old && input.kind === "message") throw Error("O histórico de mensagens é preservado. Registre uma nova mensagem.");
         if ((old?.version ?? null) !== expectedVersion)
           throw new Error(
             "CONFLICT: O registro mudou em outra sessão. Reabra antes de salvar.",

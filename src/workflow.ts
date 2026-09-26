@@ -60,7 +60,7 @@ export function validateWorkflow(input: RecordInput) {
   }
 }
 export function validateWorkflowLinks(input: RecordInput, old: WorkspaceRecord | null, related: WorkspaceRecord[], allowNewFile = false) {
-  if (!isWorkflowKind(input.kind)) return;
+  if (!isWorkflowKind(input.kind) && input.kind !== "message") return;
   const d = input.data, find = (id: string) => related.find((r) => r.id === id);
   if (d.placementId) { const placement = find(d.placementId); if (!placement || placement.kind !== "placement" || placement.operationId !== input.operationId) throw new Error("A instituição precisa estar vinculada a este cliente."); }
   if (input.kind === "document" && !allowNewFile && JSON.stringify(d.files) !== JSON.stringify(old?.data.files ?? [])) throw new Error("Os arquivos são preservados. Use o botão de anexar uma nova versão.");

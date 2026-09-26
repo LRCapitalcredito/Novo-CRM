@@ -698,7 +698,7 @@ function App() {
             <span>
               LR CAPITAL <i /> Gestão de operações
             </span>
-            <span>Nova versão · 0.9</span>
+            <span>Nova versão · 0.10</span>
           </footer>
         </main>
       </div>

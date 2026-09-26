@@ -161,7 +161,7 @@ service cloud.firestore {
         return v.keys().hasAll(['id','kind','operationId','contentJson','version','createdAt','updatedAt','updatedBy','lastEventId'])
           && v.keys().hasOnly(['id','kind','operationId','contentJson','version','createdAt','updatedAt','updatedBy','lastEventId'])
           && v.id==id && id.matches('^[a-zA-Z0-9_-]{6,100}$')
-          && v.kind in ['profile','placement','contract','diagnosis','template','simulation','document','task','dispatch']
+          && v.kind in ['profile','placement','contract','diagnosis','template','simulation','document','task','dispatch','message']
           && (v.kind=='template' ? (v.operationId=='' && admin()) : (v.operationId.matches('^[a-zA-Z0-9_-]{6,80}$') && existsAfter(/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/operations/$(v.operationId))))
           && text(v.contentJson,150000) && v.contentJson.size()>1
           && v.version is int && v.version>=1 && v.createdAt is timestamp && v.updatedAt==request.time && v.updatedBy==request.auth.uid
@@ -174,7 +174,7 @@ service cloud.firestore {
       match /records/{id} {
         allow get,list: if active();
         allow create: if editor() && validRecord(request.resource.data,id) && request.resource.data.version==1 && request.resource.data.createdAt==request.time && hasRecordAudit(request.resource.data,id);
-        allow update: if editor() && validRecord(request.resource.data,id) && request.resource.data.kind==resource.data.kind && request.resource.data.operationId==resource.data.operationId && request.resource.data.createdAt==resource.data.createdAt && request.resource.data.version==resource.data.version+1 && hasRecordAudit(request.resource.data,id);
+        allow update: if editor() && resource.data.kind!='message' && validRecord(request.resource.data,id) && request.resource.data.kind==resource.data.kind && request.resource.data.operationId==resource.data.operationId && request.resource.data.createdAt==resource.data.createdAt && request.resource.data.version==resource.data.version+1 && hasRecordAudit(request.resource.data,id);
         allow delete: if false;
       }
       match /recordEvents/{eventId} {

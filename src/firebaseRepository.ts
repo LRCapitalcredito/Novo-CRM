@@ -108,6 +108,7 @@ export function firebaseRepository(config: Config): Repository {
           throw new Error(
             "O registro mudou em outra sessão. Reabra antes de salvar.",
           );
+        if (old && input.kind === "message") throw Error("O histórico de mensagens é preservado. Registre uma nova mensagem.");
         if (
           old &&
           (old.kind !== input.kind || old.operationId !== input.operationId)

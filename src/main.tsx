@@ -69,8 +69,13 @@ const SimulatorPage = React.lazy(() =>
   import("./SimulatorPage").then((m) => ({ default: m.SimulatorPage })),
 );
 import { isInactive } from "./records";
+import { followUps } from "./workflow";
+import type { WorkflowTab } from "./WorkflowPage";
+const WorkflowPage = React.lazy(() => import("./WorkflowPage").then(m => ({ default: m.WorkflowPage })));
+const FollowUpPage = React.lazy(() => import("./WorkflowPage").then(m => ({ default: m.FollowUpPage })));
 
 type Page =
+  | "workflow"
   | "contracts"
   | "diagnosis"
   | "simulator"
@@ -85,6 +90,7 @@ type Page =
   | "settings";
 const navigation = [
   { id: "operations", label: "Carteira de operações", icon: BriefcaseBusiness },
+  { id: "workflow", label: "Acompanhamento", icon: ClipboardList },
   { id: "contracts", label: "Contratos", icon: FileText },
   { id: "simulator", label: "Simulador de crédito", icon: BarChart3 },
   { id: "diagnosis", label: "Diagnóstico financeiro", icon: ClipboardList },
@@ -126,6 +132,8 @@ function App() {
     activities: [],
   });
   const [selectedClient, setSelectedClient] = useState("");
+  const [workflowTab, setWorkflowTab] = useState<WorkflowTab>("documents");
+  const workflowLate = useMemo(() => followUps(state).filter(r => r.dueDate && r.dueDate < today()).length, [state]);
   const [page, setPage] = useState<Page>("operations");
   const [error, setError] = useState("");
   const [authError, setAuthError] = useState("");
@@ -277,8 +285,8 @@ function App() {
             >
               <Icon size={19} />
               <span>{label}</span>
-              {id === "tasks" && late.length > 0 && (
-                <small>{late.length}</small>
+              {id === "tasks" && workflowLate > 0 && (
+                <small>{workflowLate}</small>
               )}
             </button>
           ))}
@@ -407,6 +415,7 @@ function App() {
               notify={setNotice}
               onModule={(p, id) => {
                 setSelectedClient(id);
+                if (p === "workflow") setWorkflowTab("documents");
                 navigate(p);
               }}
             />
@@ -437,62 +446,8 @@ function App() {
               />
             </React.Suspense>
           )}
-          {page === "tasks" && (
-            <>
-              <PageTitle
-                eyebrow="ROTINA DA EQUIPE"
-                title="Próximas ações"
-                description="Cada retorno com um responsável e um prazo."
-              />
-              <div className="task-columns">
-                {[
-                  { title: "Em atraso", items: late, color: "red" },
-                  { title: "Hoje", items: due, color: "gold" },
-                  {
-                    title: "Próximos dias",
-                    items: operations
-                      .filter(
-                        (o) => o.dueDate > today() && !isInactive(o.stage) && !["Liberado", "Crédito na Conta"].includes(o.stage),
-                      )
-                      .sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
-                    color: "blue",
-                  },
-                ].map((group) => (
-                  <section className="task-column" key={group.title}>
-                    <h2>
-                      <i className={group.color} />
-                      {group.title}
-                      <span>{group.items.length}</span>
-                    </h2>
-                    {group.items.map((op) => (
-                      <button
-                        className="task-card"
-                        key={op.id}
-                        onClick={() => setModal(op)}
-                      >
-                        <span className={stageClass(op.stage)}>{op.stage}</span>
-                        <h3>{op.company}</h3>
-                        <p>{op.nextAction || "Definir próxima ação"}</p>
-                        <footer>
-                          <span>
-                            <CalendarDays size={14} />
-                            {displayDate(op.dueDate)}
-                          </span>
-                          <span>{op.owner}</span>
-                        </footer>
-                      </button>
-                    ))}
-                    {!group.items.length && (
-                      <Empty
-                        title="Tudo em dia"
-                        description="Nenhum retorno nesta faixa."
-                      />
-                    )}
-                  </section>
-                ))}
-              </div>
-            </>
-          )}
+          {page === "workflow" && repo && <React.Suspense fallback={<p>Carregando acompanhamento…</p>}><WorkflowPage state={state} repo={repo} canEdit={canEdit} selectedId={selectedClient} select={setSelectedClient} initialTab={workflowTab} notify={setNotice} onEditClient={setModal} /></React.Suspense>}
+          {page === "tasks" && <React.Suspense fallback={<p>Carregando agenda…</p>}><FollowUpPage state={state} onOpen={(id,tab) => { setSelectedClient(id); setWorkflowTab(tab); navigate("workflow"); }} /></React.Suspense>}
           {page === "dashboard" && (
             <>
               <PageTitle
@@ -723,7 +678,7 @@ function App() {
                   </p>
                   <p>
                     O guia PUBLICAR.md explica a configuração. Nesta versão,
-                    anexos e automações de e-mail ainda não estão ativos.
+                    os anexos estão disponíveis na prévia local. Para a equipe trabalhar em computadores diferentes, falta conectar o armazenamento em nuvem. Os envios de mensagens são manuais.
                   </p>
                   <div className="info-box">
                     <Sparkles size={18} />
@@ -741,7 +696,7 @@ function App() {
             <span>
               LR CAPITAL <i /> Gestão de operações
             </span>
-            <span>Nova versão · 0.5</span>
+            <span>Nova versão · 0.6</span>
           </footer>
         </main>
       </div>

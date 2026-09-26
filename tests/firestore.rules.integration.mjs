@@ -351,6 +351,7 @@ async function writeRecord(
       at: serverTimestamp(),
       actor: "editor teste",
       actorUid: "editor",
+      ...(["document","task","dispatch"].includes(kind) ? { contentJson } : {}),
       ...options.eventPatch,
     });
   return batch.commit();
@@ -384,6 +385,24 @@ test("contratos e diagnósticos exigem vínculo, versão e histórico atômico",
   await assertFails(
     writeRecord(db, { id: "orphan-record", operationId: "missing-operation" }),
   );
+});
+
+test("documentos, tarefas e envios preservam conteúdo no histórico e respeitam acesso", async () => {
+  const db = dbFor();
+  await writeOperation(db);
+  for (const kind of ["document", "task", "dispatch"]) {
+    const input = { id: `${kind}-workflow`, kind, contentJson: '{"status":"Registro de teste"}' };
+    await assertSucceeds(writeRecord(db, input));
+    await assertSucceeds(getDoc(doc(dbFor("reader"), `${root}/records/${input.id}`)));
+    const old = (await getDoc(doc(db, `${root}/records/${input.id}`))).data();
+    await assertFails(writeRecord(dbFor("reader"), input, old));
+    await assertFails(writeRecord(db, input, old, { noAudit: true }));
+    await assertFails(writeRecord(db, input, old, { eventPatch: { contentJson: '{"status":"Diferente"}' } }));
+    await assertFails(writeRecord(db, { ...input, operationId: "missing-operation" }, old));
+    await assertSucceeds(writeRecord(db, { ...input, contentJson: '{"status":"Atualizado"}' }, old));
+    await assertFails(writeRecord(db, input, old));
+    await assertFails(updateDoc(doc(db, `${root}/recordEvents/${input.id}-event-1`), { contentJson: '{}' }));
+  }
 });
 test("leitores consultam documentos, não alteram, e modelos são exclusivos de administradores", async () => {
   const db = dbFor();

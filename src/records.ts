@@ -2,13 +2,17 @@ import { validDate } from "./domain";
 import { simulateCredit } from "./credit";
 import { narrativeFields, numericFields } from "./diagnosis";
 import { validateDeal } from "./deals";
+import { validateWorkflow } from "./workflow";
 export type RecordKind =
   | "profile"
   | "placement"
   | "contract"
   | "diagnosis"
   | "template"
-  | "simulation";
+  | "simulation"
+  | "document"
+  | "task"
+  | "dispatch";
 export interface WorkspaceRecord {
   id: string;
   kind: RecordKind;
@@ -31,6 +35,7 @@ export interface RecordEvent {
   at: string;
   version: number;
   changes: string[];
+  contentJson?: string;
 }
 export function validateRecord(raw: any): RecordInput {
   if (
@@ -42,6 +47,9 @@ export function validateRecord(raw: any): RecordInput {
       "diagnosis",
       "template",
       "simulation",
+      "document",
+      "task",
+      "dispatch",
     ].includes(raw.kind) ||
     !/^[-\w]{6,100}$/.test(raw.id) ||
     !(
@@ -86,6 +94,7 @@ export function validateRecord(raw: any): RecordInput {
     if (raw.data.dueDate && !validDate(raw.data.dueDate))
       throw new Error("Prazo inválido.");
   }
+  validateWorkflow(raw);
   const d = raw.data;
   const text = (key: string, max = 4000) => {
     if (typeof d[key] !== "string" || d[key].length > max)

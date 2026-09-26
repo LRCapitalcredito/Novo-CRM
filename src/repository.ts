@@ -1,6 +1,8 @@
 import type { OperationInput, Session, WorkspaceState } from "./domain";
 import type { DirectoryInput, ImportSummary, LegacyDataset } from "./directory";
 export interface Repository {
+  uploadDocument?(recordId: string, expectedVersion: number, file: File): Promise<void>;
+  downloadDocument?(file: import("./workflow").DocumentFile): Promise<void>;
   saveRecord(
     record: import("./records").RecordInput,
     expectedVersion: number | null,
@@ -48,6 +50,16 @@ export async function createRepository(): Promise<Repository | null> {
   };
   return {
     mode: "preview",
+    async uploadDocument(recordId, expectedVersion, file) {
+      if (!file.size || file.size > 10485760) throw new Error("Selecione um arquivo de até 10 MB.");
+      const response = await fetch(`/__preview/document-files/${encodeURIComponent(recordId)}`, { method: "POST", headers: { "Content-Type": "application/octet-stream", "X-LR-Version": String(expectedVersion), "X-LR-Filename": encodeURIComponent(file.name) }, body: file });
+      if (!response.ok) { const result = await response.json(); throw new Error(result.error || "Falha ao anexar."); }
+    },
+    async downloadDocument(file) {
+      const response = await fetch(`/__preview/document-files/${encodeURIComponent(file.id)}/download`);
+      if (!response.ok) throw new Error("Arquivo não disponível neste ambiente.");
+      const url = URL.createObjectURL(await response.blob()), a = document.createElement("a"); a.href = url; a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
     async saveRecord(record, expectedVersion) {
       await post("/__preview/records", { record, expectedVersion });
     },

@@ -563,6 +563,8 @@ export function Drawer({
     document.body.style.overflow = "hidden";
     ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
     const listener = (e: KeyboardEvent) => {
+      // Somente a janela sobreposta mais recente recebe Escape e prende o foco.
+      if (Array.from(document.querySelectorAll(".directory-drawer")).at(-1) !== ref.current) return;
       if (e.key === "Escape") closeRef.current();
       if (e.key === "Tab") {
         const nodes = [

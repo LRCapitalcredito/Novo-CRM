@@ -15,6 +15,7 @@ import { createDirectoryStore } from "./directoryStore";
 import { createRecordStore } from "./recordStore";
 import { extractDiagnosis } from "./diagnosisAi";
 import { migratePipeline } from "./migratePipeline";
+import { maxDocumentBytes } from "./documentFiles";
 
 export function createPreviewStore(filename: string) {
   if (filename !== ":memory:")
@@ -166,6 +167,23 @@ export function previewPlugin(): Plugin {
           res.end(JSON.stringify(data));
         };
         try {
+          const uploadId = req.url?.match(/^\/document-files\/([-\w]{6,100})$/)?.[1];
+          if (uploadId && req.method === "POST") {
+            const chunks: Buffer[] = []; let size = 0;
+            for await (const chunk of req) { size += chunk.length; if (size > maxDocumentBytes) throw new Error("O arquivo excede o limite de 10 MB."); chunks.push(Buffer.from(chunk)); }
+            const version = Number(req.headers["x-lr-version"]);
+            if (!Number.isSafeInteger(version) || version < 1) throw new Error("Versão do documento inválida.");
+            const name = decodeURIComponent(String(req.headers["x-lr-filename"] || ""));
+            respond(200, store.records.attach(uploadId, version, name, Buffer.concat(chunks)));
+            publish(); return;
+          }
+          const fileId = req.url?.match(/^\/document-files\/([-\w]{6,100})\/download$/)?.[1];
+          if (fileId && req.method === "GET") {
+            const file = store.records.file(fileId);
+            if (!file) { respond(404, { error: "Arquivo não encontrado neste ambiente." }); return; }
+            res.writeHead(200, { "Content-Type": file.metadata.mime, "Content-Length": file.bytes.length, "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(file.metadata.name).replace(/'/g, "%27")}`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox" });
+            res.end(file.bytes); return;
+          }
           if (req.url === "/ai-status" && req.method === "GET") {
             respond(200, {
               available:

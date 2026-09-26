@@ -118,7 +118,7 @@ service cloud.firestore {
         return v.keys().hasAll(['id','kind','operationId','contentJson','version','createdAt','updatedAt','updatedBy','lastEventId'])
           && v.keys().hasOnly(['id','kind','operationId','contentJson','version','createdAt','updatedAt','updatedBy','lastEventId'])
           && v.id==id && id.matches('^[a-zA-Z0-9_-]{6,100}$')
-          && v.kind in ['profile','placement','contract','diagnosis','template','simulation']
+          && v.kind in ['profile','placement','contract','diagnosis','template','simulation','document','task','dispatch']
           && (v.kind=='template' ? (v.operationId=='' && admin()) : (v.operationId.matches('^[a-zA-Z0-9_-]{6,80}$') && existsAfter(/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/operations/$(v.operationId))))
           && text(v.contentJson,150000) && v.contentJson.size()>1
           && v.version is int && v.version>=1 && v.createdAt is timestamp && v.updatedAt==request.time && v.updatedBy==request.auth.uid
@@ -137,10 +137,11 @@ service cloud.firestore {
       match /recordEvents/{eventId} {
         function validRecordEvent(e) {
           let v=getAfter(/databases/$(database)/documents/lr_v2_workspaces/$(workspace)/records/$(e.recordId)).data;
-          return v.lastEventId==eventId && e.operationId==v.operationId && e.kind==v.kind && e.version==v.version;
+          return v.lastEventId==eventId && e.operationId==v.operationId && e.kind==v.kind && e.version==v.version
+            && (v.kind in ['document','task','dispatch'] ? (e.keys().hasAll(['contentJson']) && e.contentJson==v.contentJson) : !e.keys().hasAny(['contentJson']));
         }
         allow get,list: if active();
-        allow create: if editor() && request.resource.data.keys().hasAll(['recordId','operationId','kind','actor','actorUid','at','version']) && request.resource.data.keys().hasOnly(['recordId','operationId','kind','actor','actorUid','at','version']) && request.resource.data.actor==member().name && request.resource.data.actorUid==request.auth.uid && request.resource.data.at==request.time && validRecordEvent(request.resource.data);
+        allow create: if editor() && request.resource.data.keys().hasAll(['recordId','operationId','kind','actor','actorUid','at','version']) && request.resource.data.keys().hasOnly(['recordId','operationId','kind','actor','actorUid','at','version','contentJson']) && request.resource.data.actor==member().name && request.resource.data.actorUid==request.auth.uid && request.resource.data.at==request.time && validRecordEvent(request.resource.data);
         allow update,delete: if false;
       }
       match /activities/{eventId} {

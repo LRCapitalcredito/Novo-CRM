@@ -17,6 +17,7 @@ import {
   ListFilter,
   Rows3,
   LayoutList,
+  FolderOpen,
 } from "lucide-react";
 import {
   money,
@@ -39,6 +40,7 @@ import type { Repository } from "./repository";
 import { isWorking, matchesAttention, matchesModality, modalityGroups, normalizeSearch, portfolioIndex, priorityOrder, stageTone, type Attention, type ModalityGroup } from "./portfolio";
 import { InlineOperationControls } from "./InlineOperationControls";
 import { DealFields, DealSummary, dealDraft, readDeal } from "./DealFields";
+import { pendingDocument, readyDocument } from "./workflow";
 import "./modules.css";
 const err = (e: unknown) =>
   e instanceof Error ? e.message : "Não foi possível salvar.";
@@ -54,7 +56,7 @@ export function ClientPortfolio({
   repo: Repository;
   canEdit: boolean;
   onEdit: (op: Operation | "new") => void;
-  onModule: (page: "contracts" | "diagnosis" | "simulator", id: string) => void;
+  onModule: (page: "contracts" | "diagnosis" | "simulator" | "workflow", id: string) => void;
   notify: (s: string) => void;
 }) {
   const [search, setSearch] = useState(""),
@@ -169,6 +171,7 @@ export function ClientPortfolio({
         <button onClick={() => onModule("contracts", "")}><FileText size={15} /> Emitir contrato</button>
         <button onClick={() => onModule("simulator", "")}><Calculator size={15} /> Simular crédito</button>
         <button onClick={() => onModule("diagnosis", "")}><ClipboardList size={15} /> Preparar diagnóstico</button>
+        <button onClick={() => onModule("workflow", "")}><FolderOpen size={15} /> Acompanhamento e documentos</button>
       </div>
       <div className="module-toolbar">
         <label className="search-field">
@@ -225,6 +228,7 @@ export function ClientPortfolio({
         </div>
         {displayed.map((entry) => {
           const { operation: op, links } = entry;
+          const documents = records.filter((r) => r.operationId === op.id && r.kind === "document" && !r.data.archived);
           const
             profile = findRecord(records, "profile", op.id);
           return (
@@ -246,6 +250,7 @@ export function ClientPortfolio({
                       {op.cnpj || "Documento a completar"} · {links.length}{" "}
                       instituições
                     </small>
+                    {!!documents.length && <small>Documentos: {documents.filter((r) => readyDocument(r)).length}/{documents.length} conferidos · {documents.filter((r) => pendingDocument(r)).length} pendentes</small>}
                   </span>
                 </button>
                 <div data-label="Etapa">
@@ -257,13 +262,14 @@ export function ClientPortfolio({
                 </span>
                 <span className="next-action" data-label="Próximo passo" title={op.nextAction}>
                   {op.nextAction || "Próximo passo a definir"}
-                  <small className={entry.late ? "due-overdue" : ""}>{entry.nextDue ? <><Clock3 size={11} /> {displayDate(entry.nextDue)}{entry.late ? " · vencido" : ""}{entry.nextDue !== op.dueDate ? " · instituição" : ""}</> : isWorking(op) ? "Sem prazo definido" : "Sem retorno agendado"}</small>
+                  <small className={entry.late ? "due-overdue" : ""}>{entry.nextDue ? <><Clock3 size={11} /> {displayDate(entry.nextDue)}{entry.late ? " · vencido" : ""}{entry.nextDue !== op.dueDate ? " · acompanhamento" : ""}</> : isWorking(op) ? "Sem prazo definido" : "Sem retorno agendado"}</small>
                 </span>
                 <span className="portfolio-owner" data-label="Responsável"><i>{op.owner?.slice(0, 1) || "—"}</i>{op.owner}</span>
               </div>
               {expanded === op.id && (
                 <div className="client-expanded">
                   <div className="module-actions">
+                    <button className="primary" onClick={() => onModule("workflow", op.id)}><FolderOpen size={15} /> Documentos e acompanhamento</button>
                     <button onClick={() => onEdit(op)}>
                       <Settings2 size={15} /> Dados do cliente
                     </button>
@@ -461,7 +467,7 @@ function InstitutionList({
     </>
   );
 }
-function RecordEditor({
+export function RecordEditor({
   op,
   record,
   kind,

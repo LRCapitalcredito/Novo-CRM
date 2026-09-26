@@ -1,5 +1,6 @@
-import { type Operation, type WorkspaceState, today, validDate } from "./domain";
+import { type Operation, type WorkspaceState, today } from "./domain";
 import { isInactive, type WorkspaceRecord } from "./records";
+import { followUps } from "./workflow";
 
 export const normalizeSearch = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
 export const isWorking = (op: Operation) => !isInactive(op.stage) && !["Liberado", "Crédito na Conta"].includes(op.stage);
@@ -16,6 +17,8 @@ export function matchesModality(row: PortfolioEntry, group: ModalityGroup) {
 }
 export function portfolioIndex(state: WorkspaceState, date = today()) {
   const placements = new Map<string, WorkspaceRecord[]>();
+  const datesByClient = new Map<string, string[]>();
+  for (const item of followUps(state, date)) { if (item.dueDate) { const dates = datesByClient.get(item.operationId) ?? []; dates.push(item.dueDate); datesByClient.set(item.operationId, dates); } }
   for (const record of state.records ?? []) {
     if (record.kind !== "placement") continue;
     const current = placements.get(record.operationId) ?? [];
@@ -25,7 +28,7 @@ export function portfolioIndex(state: WorkspaceState, date = today()) {
   return state.operations.map((operation) => {
     const links = placements.get(operation.id) ?? [];
     // Datas de atualização não representam compromissos. Somente prazos explícitos.
-    const dates = isWorking(operation) ? [operation.dueDate, ...links.filter((r) => r.data.active).map((r) => r.data.dueDate)].filter((d): d is string => typeof d === "string" && !!d && validDate(d)).sort() : [];
+    const dates = isWorking(operation) ? (datesByClient.get(operation.id) ?? []).sort() : [];
     return { operation, links, nextDue: dates[0] ?? "", late: dates.some((d) => d < date), dueToday: dates.includes(date), unscheduled: isWorking(operation) && dates.length === 0,
       search: normalizeSearch([operation.company, operation.cnpj, operation.owner, operation.nextAction, operation.contact, ...links.flatMap((r) => [r.data.institution, r.data.manager])].join(" ")) };
   });

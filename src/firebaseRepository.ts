@@ -17,6 +17,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import type { Repository } from "./repository";
+import { isWorkflowKind, validateWorkflowLinks } from "./workflow";
 import {
   validateRecord,
   type WorkspaceRecord,
@@ -100,6 +101,14 @@ export function firebaseRepository(config: Config): Repository {
               );
           }
         }
+        const oldRecord = old ? { ...old, data: JSON.parse(old.contentJson) } as WorkspaceRecord : null;
+        const relatedIds = [input.data.placementId, ...(input.kind === "dispatch" && !old ? input.data.items.map((item: any) => item.documentId) : [])].filter(Boolean);
+        const related: WorkspaceRecord[] = [];
+        for (const id of new Set<string>(relatedIds)) {
+          const snap = await tx.get(doc(db, root, "records", id));
+          if (snap.exists()) related.push({ ...snap.data(), data: JSON.parse(snap.data().contentJson) } as WorkspaceRecord);
+        }
+        validateWorkflowLinks(input, oldRecord, related);
         const version = (old?.version ?? 0) + 1,
           contentJson = JSON.stringify(input.data);
         tx.set(target, {
@@ -121,6 +130,7 @@ export function firebaseRepository(config: Config): Repository {
           actorUid: actor.uid,
           at: serverTimestamp(),
           version,
+          ...(isWorkflowKind(input.kind) ? { contentJson } : {}),
         });
       });
     },

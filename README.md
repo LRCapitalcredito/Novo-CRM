@@ -1,6 +1,22 @@
 # LR Capital · Novo CRM
 
-Versão 0.5: carteira, atuação por instituição, bancos, gerentes, contratos, simulador e diagnóstico financeiro, com identidade oficial da LR Capital e capa interativa. React + TypeScript; prévia com SQLite; adaptador Firebase para o ambiente publicado. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
+Versão 0.6: carteira, atuação por instituição, bancos, gerentes, contratos, simulador e diagnóstico financeiro, com identidade oficial da LR Capital e capa interativa. React + TypeScript; prévia com SQLite; adaptador Firebase para o ambiente publicado. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
+
+### Documentos e acompanhamento
+
+A aba **Acompanhamento** organiza o trabalho por cliente. Na carteira, abra a linha do cliente e escolha **Documentos e acompanhamento**.
+
+1. **Preparar checklist:** sugestões selecionáveis para captação de crédito, antecipação de recebíveis e home equity, com entidade, competência, responsável, prazo e exigência. É uma base editável a confirmar com cada instituição. Repetir a preparação não duplica nem sobrescreve os itens existentes.
+2. **Receber e conferir:** anexe um documento por item (PDF, PNG, JPG, DOCX ou XLSX, até 10 MB), ou registre um link HTTPS. Arquivos complementares devem ter itens próprios; a última versão é a selecionada no envio. Recebido, em conferência, conferido, a corrigir e dispensado são situações distintas. Conferência/dispensa exige justificativa; documentos vencidos não entram em novos envios. Assinatura observada não equivale a validação digital.
+3. **Encaminhar ao gerente:** selecione a instituição vinculada e os documentos conferidos. Prepare a mensagem, encaminhe pelo canal habitual e registre o envio realizado. O registro preserva destinatário, canal, data, versão do cadastro e arquivo selecionado. O arquivo daquela remessa pode ser baixado novamente, mesmo após uma nova versão documental.
+4. **Cobrar retorno:** registre responsável, próximo passo, prazo e resposta. Alterações mantêm o conteúdo de cada versão no histórico recente, sem apagar respostas anteriores. Crie tarefas que dependem da LR Capital, do cliente/contador ou da instituição. Concluir uma tarefa exige data e resultado.
+5. **Atualizar o cliente:** gere um texto editável com etapa, situação documental, encaminhamentos e próximos passos. Os botões preparam textos para revisão e cópia; não enviam mensagens nem atribuem aprovação de crédito.
+
+**Próximas ações** reúne compromissos da carteira, documentos, instituições, tarefas e envios, com filtros por atraso, hoje, próximos dias, sem prazo, responsável e dependência. O radar da carteira incorpora os novos prazos sem duplicar o cliente. Nenhum checklist é criado automaticamente nos clientes reais.
+
+**Armazenamento:** anexos ficam como bytes originais no SQLite da prévia, com identificação SHA-256 e versões preservadas. A verificação do formato é de compatibilidade, não análise de conteúdo ou assinatura. O download preserva o arquivo original. A exportação JSON não inclui os arquivos: faça backup do banco local (com a aplicação fechada, ou via backup consistente do SQLite). Arquivar um item preserva seus anexos. Não há exclusão de arquivo pela interface.
+
+No Firebase, os cadastros, links, tarefas e registros de envio usam a sincronização existente. **O armazenamento de arquivos em nuvem ainda não está conectado**; a interface informa essa limitação e aceita links de um repositório documental já autorizado. Publicar o site não transfere os arquivos locais. O histórico exibido é o conjunto dos 400 eventos mais recentes da equipe, não uma pesquisa histórica ilimitada.
 
 ### Edição e condições por modalidade
 
@@ -15,7 +31,7 @@ Versão 0.5: carteira, atuação por instituição, bancos, gerentes, contratos,
 
 - Logo oficial no acesso, menu e ícone do navegador. Retratos de Ricardo Reis, Lucas Macedo e Giovani Moura de Souza reaproveitados dos materiais do site fornecidos pelo usuário; apresentação conferida em https://www.lrcapitalcredito.com/.
 - Capa recolhível e apresentação institucional com perfis dos sócios, navegação por teclado e respeito à preferência por movimento reduzido.
-- Resumo clicável da carteira, radar de retornos de hoje, vencidos e sem prazo. Considera os prazos explícitos do cliente e dos vínculos ativos. Cada cliente conta uma vez; cadastros concluídos ou para retomada não aparecem como atrasos da operação corrente. Datas de atualização não são prazos.
+- Resumo clicável da carteira, radar de retornos de hoje, vencidos e sem prazo. Considera os prazos explícitos do cliente, dos vínculos ativos e do acompanhamento documental. Cada cliente conta uma vez; cadastros concluídos ou para retomada não aparecem como atrasos da operação corrente. Datas de atualização não são prazos.
 - Ordenação inicial por operações ativas e prazo; opções por nome, demanda, retorno e ordem original. Busca também por contato, instituição e gerente dos vínculos.
 - Filtros por responsável, produto, situação e prazo, páginas de 25 clientes e linhas compactas. Produtos ausentes permanecem sem informação; a interface não inventa classificações.
 - A preferência de capa e densidade é individual, salva neste navegador. Dados operacionais continuam no repositório configurado (SQLite local ou Firebase).
@@ -85,7 +101,7 @@ Na prévia, o estado completo é enviado via SSE. No Firebase, as coleções ope
 
 As regras validam equipe, permissão, vínculo, versão e auditoria. Registros complementares usam `contentJson`, limitado a 150 mil caracteres: os campos internos são validados pela aplicação e pelo servidor da prévia, **não por um parser nas regras Firestore**. Para validação independente do cliente em produção, adotar endpoint autenticado ou campos normalizados com regras específicas antes de liberar integrações externas.
 
-Ainda não há migração local → Firebase, anexos/contratos assinados, Gmail, portal do cliente, automações de envio ou conversa automática completa. Exportação não substitui backup. O banco e o site originais não foram modificados.
+Ainda não há migração local → Firebase, armazenamento de anexos em nuvem, integração de assinatura, Gmail, portal do cliente, automações de envio ou conversa automática completa. Exportação não substitui backup. O banco e o site originais não foram modificados.
 
 ## Testar e publicar
 
@@ -100,6 +116,7 @@ Siga [PUBLICAR.md](PUBLICAR.md). `firebase.json` publica apenas Hosting no desti
 
 | Área                    | Arquivos                                       |
 | ----------------------- | ---------------------------------------------- |
+| Acompanhamento e agenda | `src/WorkflowPage.tsx`, `src/workflow.ts`, `server/documentFiles.ts` |
 | Carteira e instituições | `src/ClientPortfolio.tsx`                      |
 | Contratos e diagnóstico | `src/DocumentPages.tsx`, `src/pdf.ts`          |
 | Cálculos                | `src/credit.ts`, `src/diagnosis.ts`            |

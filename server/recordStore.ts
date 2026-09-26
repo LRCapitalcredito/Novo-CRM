@@ -1,5 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
+import { inspectDocumentFile } from "./documentFiles";
+import { isWorkflowKind, validateWorkflowLinks, type DocumentFile } from "../src/workflow";
 import {
   validateRecord,
   type WorkspaceRecord,
@@ -9,13 +11,14 @@ export function createRecordStore(db: DatabaseSync) {
   db.exec(
     "CREATE TABLE IF NOT EXISTS workspace_records(id TEXT PRIMARY KEY,data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS record_events(id TEXT PRIMARY KEY,data TEXT NOT NULL,at TEXT NOT NULL)",
   );
+  db.exec("CREATE TABLE IF NOT EXISTS document_files(id TEXT PRIMARY KEY,record_id TEXT NOT NULL,metadata TEXT NOT NULL,bytes BLOB NOT NULL)");
   const get = (id: string): WorkspaceRecord | null => {
     const row = db
       .prepare("SELECT data FROM workspace_records WHERE id=?")
       .get(id);
     return row ? JSON.parse(String(row.data)) : null;
   };
-  return {
+  const api = {
     get,
     state() {
       return {
@@ -33,6 +36,7 @@ export function createRecordStore(db: DatabaseSync) {
       raw: unknown,
       expectedVersion: number | null,
       actor = "Ricardo · prévia",
+      attachment?: { metadata: DocumentFile; bytes: Uint8Array },
     ) {
       const input = validateRecord(raw);
       db.exec("BEGIN IMMEDIATE");
@@ -54,6 +58,8 @@ export function createRecordStore(db: DatabaseSync) {
             .get(input.operationId)
         )
           throw new Error("Cliente/operação não encontrado.");
+        const relatedIds = [input.data.placementId, ...(input.kind === "dispatch" && !old ? input.data.items.map((item: any) => item.documentId) : [])].filter(Boolean);
+        validateWorkflowLinks(input, old, relatedIds.map(get).filter((r): r is WorkspaceRecord => !!r), !!attachment);
         if (input.kind === "placement" && input.data.bankId) {
           const bank = db
             .prepare("SELECT data FROM directory WHERE id=?")
@@ -90,6 +96,7 @@ export function createRecordStore(db: DatabaseSync) {
           actor,
           at,
           version: next.version,
+          ...(isWorkflowKind(input.kind) ? { contentJson: JSON.stringify(input.data) } : {}),
           changes: Object.keys(input.data).filter(
             (k) =>
               JSON.stringify(old?.data[k]) !== JSON.stringify(input.data[k]),
@@ -103,12 +110,28 @@ export function createRecordStore(db: DatabaseSync) {
           JSON.stringify(event),
           at,
         );
+        if (attachment) db.prepare("INSERT INTO document_files VALUES (?,?,?,?)").run(attachment.metadata.id, input.id, JSON.stringify(attachment.metadata), attachment.bytes);
         db.exec("COMMIT");
         return next;
       } catch (e) {
         db.exec("ROLLBACK");
         throw e;
       }
+    },
+  };
+  return {
+    get: api.get, state: api.state,
+    save: (raw: unknown, version: number | null, actor?: string) => api.save(raw, version, actor),
+    attach(recordId: string, expectedVersion: number, name: string, bytes: Uint8Array) {
+      const old = get(recordId);
+      if (!old || old.kind !== "document" || old.data.archived) throw new Error("Selecione um item ativo do checklist.");
+      const metadata = inspectDocumentFile(name, bytes);
+      if (old.data.files.some((f: DocumentFile) => f.sha256 === metadata.sha256)) throw new Error("Este mesmo arquivo já está anexado ao item.");
+      return api.save({ ...old, data: { ...old.data, files: [...old.data.files, metadata], status: "Recebido", reviewNotes: "", signatureCheck: "Não verificada" } }, expectedVersion, "Ricardo · prévia", { metadata, bytes });
+    },
+    file(id: string) {
+      const row = db.prepare("SELECT metadata, bytes FROM document_files WHERE id=?").get(id);
+      return row ? { metadata: JSON.parse(String(row.metadata)) as DocumentFile, bytes: row.bytes as Uint8Array } : null;
     },
   };
 }

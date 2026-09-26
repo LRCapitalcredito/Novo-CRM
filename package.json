@@ -1,11 +1,12 @@
 {
   "name": "lr-capital-v2",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5174 --strictPort",
     "build": "tsc --noEmit && vite build",
+    "build:hosting": "node scripts/build-hosting.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 4174 --strictPort",
     "test": "tsx --test tests/*.test.ts"
   },

@@ -1,6 +1,16 @@
 # LR Capital · Novo CRM
 
-Versão 0.6: carteira, atuação por instituição, bancos, gerentes, contratos, simulador e diagnóstico financeiro, com identidade oficial da LR Capital e capa interativa. React + TypeScript; prévia com SQLite; adaptador Firebase para o ambiente publicado. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
+Versão 0.7: carteira, atuação por instituição, bancos, gerentes, contratos, simulador, diagnóstico financeiro e acompanhamento documental. React + TypeScript; prévia independente com SQLite; ambiente compartilhado com Firebase. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
+
+Ambiente de validação: https://lr-capital-crm-v2-2026.web.app — login Google e autorização por membro da equipe. Consulte [PUBLICAR.md](PUBLICAR.md) para atualizações. O sistema anterior permanece independente.
+
+### Contatos, documentação e atuação
+
+- WhatsApp e e-mail na carteira e no acompanhamento: revise uma mensagem casual já preparada com os documentos que faltam. O envio final acontece no aplicativo escolhido; abrir a conversa não registra um envio fictício.
+- Documentação mínima conforme as frentes do cliente. Itens recebidos ainda precisam ser conferidos; dispensas exigem justificativa. A falta de checklist não produz um indicador de documentação completa.
+- Pedidos dos gerentes: cole a solicitação, revise os documentos e períodos sugeridos por palavras-chave e registre as exigências na instituição correta. O pedido original fica guardado. Pedidos repetidos não duplicam o mesmo documento/período dentro da instituição.
+- Botões para situação de restrição e múltiplas frentes de atuação. As classificações alimentam os filtros e o checklist, sem inferir aprovação de crédito.
+- Proteção contra edições concorrentes, inclusive na classificação. A primeira carga do Firebase aguarda os seis conjuntos de dados antes de exibir a carteira.
 
 ### Documentos e acompanhamento
 
@@ -101,7 +111,7 @@ Na prévia, o estado completo é enviado via SSE. No Firebase, as coleções ope
 
 As regras validam equipe, permissão, vínculo, versão e auditoria. Registros complementares usam `contentJson`, limitado a 150 mil caracteres: os campos internos são validados pela aplicação e pelo servidor da prévia, **não por um parser nas regras Firestore**. Para validação independente do cliente em produção, adotar endpoint autenticado ou campos normalizados com regras específicas antes de liberar integrações externas.
 
-Ainda não há migração local → Firebase, armazenamento de anexos em nuvem, integração de assinatura, Gmail, portal do cliente, automações de envio ou conversa automática completa. Exportação não substitui backup. O banco e o site originais não foram modificados.
+A migração inicial local → Firebase foi concluída e conferida no projeto dedicado. Alterações posteriores da prévia não são importadas automaticamente. Ainda não há armazenamento de anexos em nuvem, integração de assinatura, Gmail, portal do cliente, automações de envio ou conversa automática completa. Exportação não substitui backup. O banco e o site originais não foram modificados.
 
 ## Testar e publicar
 
@@ -112,7 +122,7 @@ npm run build
 
 O GitHub Actions também executa as regras em emulador Firestore com Java 21 e projeto `demo-`. Testes abrangem cálculos, datas, ausências, documentos, importação, idempotência, persistência, conflito e permissões.
 
-Siga [PUBLICAR.md](PUBLICAR.md). `firebase.json` publica apenas Hosting no destino separado `lr-v2`; não implanta regras nem altera o site existente. Banco local e modelo privado não entram no build. Após configurar e homologar o Firebase, migrar dados de forma revisada e importar o modelo pela aba Contratos.
+Siga [PUBLICAR.md](PUBLICAR.md). `firebase.validation.json` aponta ao projeto novo; `npm run build:hosting` prepara a interface e a configuração pública sem conectar a prévia local à carteira compartilhada. Banco local e modelo privado não entram no build. O modelo privado é consultado no banco protegido, pela aba Contratos.
 
 | Área                    | Arquivos                                       |
 | ----------------------- | ---------------------------------------------- |

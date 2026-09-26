@@ -3,6 +3,9 @@ import {
   getAuth,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
 } from "firebase/auth";
 import {
@@ -43,6 +46,7 @@ type Config = {
   projectId: string;
   appId: string;
   workspaceId?: string;
+  passwordLoginEnabled?: boolean;
 };
 const iso = (value: any) => value?.toDate?.().toISOString?.() || "";
 export function firebaseRepository(config: Config): Repository {
@@ -55,6 +59,7 @@ export function firebaseRepository(config: Config): Repository {
   let membershipUnsub: (() => void) | undefined;
   const repo: Repository = {
     mode: "firebase",
+    passwordLoginEnabled: config.passwordLoginEnabled !== false,
     async saveRecord(raw, expectedVersion) {
       if (!auth.currentUser || !repo.session || repo.session.role === "reader")
         throw new Error("Sem permissão para alterar.");
@@ -136,6 +141,7 @@ export function firebaseRepository(config: Config): Repository {
     },
     session: null,
     authListener(callback) {
+      getRedirectResult(auth).catch(() => callback(null, "O acesso Google não foi concluído. Tente novamente com a conta habilitada."));
       const unsub = onAuthStateChanged(auth, (user) => {
         membershipUnsub?.();
         repo.session = null;
@@ -185,11 +191,26 @@ export function firebaseRepository(config: Config): Repository {
         throw new Error("Não foi possível entrar. Confira o e-mail e a senha.");
       }
     },
+    async loginGoogle() {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch {
+        throw new Error("Não foi possível entrar com Google. Tente novamente com a conta habilitada.");
+      }
+    },
     async logout() {
       await signOut(auth);
     },
     subscribe(next, error) {
       let state: WorkspaceState = { operations: [], activities: [] };
+      const received = new Set<string>();
+      const publish = (collectionName: string) => {
+        received.add(collectionName);
+        // Avoid displaying a partially loaded checklist or institution list.
+        if (received.size === 6) next(state);
+      };
       const failed = () =>
         error(
           "Falha ao sincronizar. Confira sua conexão e as permissões da equipe.",
@@ -209,7 +230,7 @@ export function firebaseRepository(config: Config): Repository {
               } as Operation;
             }),
           };
-          next(state);
+          publish("operations");
         },
         failed,
       );
@@ -227,7 +248,7 @@ export function firebaseRepository(config: Config): Repository {
                 ({ ...d.data(), id: d.id, at: iso(d.data().at) }) as Activity,
             ),
           };
-          next(state);
+          publish("activities");
         },
         failed,
       );
@@ -247,7 +268,7 @@ export function firebaseRepository(config: Config): Repository {
             ...state,
             directory: { ...(state.directory ?? emptyDirectory), records },
           };
-          next(state);
+          publish("directory");
         },
         failed,
       );
@@ -272,7 +293,7 @@ export function firebaseRepository(config: Config): Repository {
               ),
             },
           };
-          next(state);
+          publish("directoryEvents");
         },
         failed,
       );
@@ -298,7 +319,7 @@ export function firebaseRepository(config: Config): Repository {
                 } as WorkspaceRecord;
               }),
             };
-            next(state);
+            publish("records");
           } catch {
             failed();
           }
@@ -324,7 +345,7 @@ export function firebaseRepository(config: Config): Repository {
                 }) as unknown as RecordEvent,
             ),
           };
-          next(state);
+          publish("recordEvents");
         },
         failed,
       );

@@ -40,6 +40,8 @@ import type { Repository } from "./repository";
 import { isWorking, matchesAttention, matchesModality, modalityGroups, normalizeSearch, portfolioIndex, priorityOrder, stageTone, type Attention, type ModalityGroup } from "./portfolio";
 import { InlineOperationControls } from "./InlineOperationControls";
 import { DealFields, DealSummary, dealDraft, readDeal } from "./DealFields";
+import { ContactButtons, ClientClassification } from "./ClientActions";
+import { activeTracks, minimumChecklist } from "./clientFlow";
 import { pendingDocument, readyDocument } from "./workflow";
 import "./modules.css";
 const err = (e: unknown) =>
@@ -238,7 +240,7 @@ export function ClientPortfolio({
                   "portfolio-row " + (expanded === op.id ? "open" : "")
                 }
               >
-                <button className="client-title client-toggle" aria-expanded={expanded === op.id} aria-label={`Instituições de ${op.company}`} onClick={() => setExpanded(expanded === op.id ? null : op.id)}>
+                <div className="client-row-identity"><button className="client-title client-toggle" aria-expanded={expanded === op.id} aria-label={`Instituições de ${op.company}`} onClick={() => setExpanded(expanded === op.id ? null : op.id)}>
                   {expanded === op.id ? (
                     <ChevronDown size={17} />
                   ) : (
@@ -250,11 +252,14 @@ export function ClientPortfolio({
                       {op.cnpj || "Documento a completar"} · {links.length}{" "}
                       instituições
                     </small>
-                    {!!documents.length && <small>Documentos: {documents.filter((r) => readyDocument(r)).length}/{documents.length} conferidos · {documents.filter((r) => pendingDocument(r)).length} pendentes</small>}
+                    <small>{minimumChecklist(op,records).complete?"✓ Mínimo documental conferido":"○ Mínimo documental: "+minimumChecklist(op,records).done+"/"+minimumChecklist(op,records).total} · {documents.filter((r)=>pendingDocument(r)).length} pendências registradas</small>
                   </span>
                 </button>
+                <ContactButtons op={op} records={records} notify={notify}/></div>
                 <div data-label="Etapa">
                   <InlineOperationControls op={op} repo={repo} canEdit={canEdit} notify={notify} />
+                  <ClientClassification op={op} state={state} repo={repo} canEdit={canEdit} notify={notify}/>
+                  <div className="client-track-labels">{activeTracks(op,records).join(" · ")||"Frentes a definir"}</div>
                 </div>
                 <span data-label="Demanda">
                   {money(op.requestedCents)}

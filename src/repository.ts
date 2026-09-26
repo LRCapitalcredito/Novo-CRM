@@ -19,6 +19,8 @@ export interface Repository {
     callback: (session: Session | null, error?: string) => void,
   ): () => void;
   login(email: string, password: string): Promise<void>;
+  loginGoogle?(): Promise<void>;
+  passwordLoginEnabled?: boolean;
   logout(): Promise<void>;
   subscribe(
     next: (state: WorkspaceState) => void,

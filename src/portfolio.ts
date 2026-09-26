@@ -1,5 +1,6 @@
 import { type Operation, type WorkspaceState, today } from "./domain";
 import { isInactive, type WorkspaceRecord } from "./records";
+import { activeTracks } from "./clientFlow";
 import { followUps } from "./workflow";
 
 export const normalizeSearch = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
@@ -10,6 +11,7 @@ export type ModalityGroup = (typeof modalityGroups)[number];
 export function matchesModality(row: PortfolioEntry, group: ModalityGroup) {
   const values = [row.operation.product, ...row.links.map((r) => r.data.deal?.modality)].filter((p) => p && p !== "Não informado");
   if (group === "Todas as modalidades") return true;
+  if (row.tracks) return group === "A classificar" ? row.tracks.length === 0 : row.tracks.includes(group);
   if (group === "A classificar") return values.length === 0;
   if (group === "Captação de crédito") return values.some((p) => ["Capital de giro", "Crédito estruturado", "Financiamento", "Crédito rural"].includes(p));
   if (group === "Outras possibilidades") return values.some((p) => ["Reestruturação de dívida", "Outras modalidades"].includes(p));
@@ -29,7 +31,7 @@ export function portfolioIndex(state: WorkspaceState, date = today()) {
     const links = placements.get(operation.id) ?? [];
     // Datas de atualização não representam compromissos. Somente prazos explícitos.
     const dates = isWorking(operation) ? (datesByClient.get(operation.id) ?? []).sort() : [];
-    return { operation, links, nextDue: dates[0] ?? "", late: dates.some((d) => d < date), dueToday: dates.includes(date), unscheduled: isWorking(operation) && dates.length === 0,
+    return { operation, links, tracks: activeTracks(operation, state.records ?? []), nextDue: dates[0] ?? "", late: dates.some((d) => d < date), dueToday: dates.includes(date), unscheduled: isWorking(operation) && dates.length === 0,
       search: normalizeSearch([operation.company, operation.cnpj, operation.owner, operation.nextAction, operation.contact, ...links.flatMap((r) => [r.data.institution, r.data.manager])].join(" ")) };
   });
 }

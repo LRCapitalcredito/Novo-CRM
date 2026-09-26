@@ -30,6 +30,7 @@ export function validateWorkflow(input: RecordInput) {
     for (const k of ["period", "templateKey", "placementId"]) text(k, 150);
     for (const k of ["requirement", "reviewNotes", "sourceUrl"]) text(k);
     for (const k of ["dueDate", "expiresOn", "requestedOn"]) date(k);
+    for (const k of ["requestedBy","demandKey","managerRequest"]) if (d[k] !== undefined) text(k,k==="managerRequest"?6000:k==="demandKey"?600:200);
     if (d.requestedOn > today()) throw new Error("A solicitação registrada não pode estar no futuro.");
     if (!documentStatuses.includes(d.status) || !categories.includes(d.category) || !signatureChecks.includes(d.signatureCheck) || typeof d.required !== "boolean" || typeof d.archived !== "boolean") throw new Error("Situação documental inválida.");
     if (!safeDocumentUrl(d.sourceUrl)) throw new Error("Use um link HTTPS válido, sem senha na URL.");

@@ -2,6 +2,7 @@ import { validDate } from "./domain";
 import { simulateCredit } from "./credit";
 import { narrativeFields, numericFields } from "./diagnosis";
 import { validateDeal } from "./deals";
+import { validateClientProfile } from "./clientFlow";
 import { validateWorkflow } from "./workflow";
 export type RecordKind =
   | "profile"
@@ -104,8 +105,10 @@ export function validateRecord(raw: any): RecordInput {
     if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > max)
       throw new Error("Valor numérico inválido.");
   };
-  if (raw.kind === "profile")
+  if (raw.kind === "profile") {
     for (const k of ["address", "city", "state", "segment"]) text(k, 500);
+    validateClientProfile(d);
+  }
   if (raw.kind === "contract") {
     for (const k of [
       "company",

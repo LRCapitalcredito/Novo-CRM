@@ -696,7 +696,7 @@ function App() {
             <span>
               LR CAPITAL <i /> Gestão de operações
             </span>
-            <span>Nova versão · 0.6</span>
+            <span>Nova versão · 0.7</span>
           </footer>
         </main>
       </div>
@@ -853,6 +853,13 @@ function Login({ repo, error }: { repo: Repository; error: string }) {
           <div className="eyebrow">BEM-VINDO À LR CAPITAL</div>
           <h2>Acesse sua carteira</h2>
           <p>Entre com a conta habilitada para a equipe.</p>
+          {repo.loginGoogle && <button className="button primary" type="button" disabled={busy} onClick={async () => {
+            setBusy(true); setLocalError("");
+            try { await repo.loginGoogle!(); } catch (err) { setLocalError(errorText(err)); } finally { setBusy(false); }
+          }}>{busy ? "Abrindo acesso…" : "Entrar com Google"}<ArrowRight size={17} /></button>}
+          {repo.loginGoogle && <small>Use a conta Google autorizada para a LR Capital. A senha não é solicitada pelo sistema.</small>}
+          {repo.passwordLoginEnabled !== false && <details>
+          <summary>Acesso com e-mail e senha já cadastrados</summary>
           <label>
             E-mail
             <input
@@ -873,15 +880,15 @@ function Login({ repo, error }: { repo: Repository; error: string }) {
               autoComplete="current-password"
             />
           </label>
+          <button className="button secondary" disabled={busy}>
+            {busy ? "Entrando…" : "Entrar com e-mail e senha"}
+          </button>
+          </details>}
           {(error || localError) && (
             <div className="form-error" role="alert">
               {error || localError}
             </div>
           )}
-          <button className="button primary" disabled={busy}>
-            {busy ? "Entrando…" : "Entrar no sistema"}
-            <ArrowRight size={17} />
-          </button>
           <small>Precisa de acesso? Fale com o administrador da equipe.</small>
         </form>
       </main>

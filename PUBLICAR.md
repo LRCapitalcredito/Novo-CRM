@@ -1,125 +1,82 @@
-# Publicar a LR Capital no Firebase
+# Publicar e atualizar a LR Capital
 
-Guia da versão 0.3 — 25/09/2026. O código está preparado para publicação estática, mas ainda precisa ser conectado ao projeto Firebase e às contas da equipe. Nenhum projeto de produção foi alterado nesta entrega.
+Versão 0.7 · 26/09/2026.
 
-## 1. Entender o que pode ficar sem custo
+## Ambiente disponível
 
-Use **Firebase Hosting**, Authentication com e-mail/senha e Cloud Firestore. Para começar sem cobrança variável, use o plano **Spark** e acompanhe os limites. Não é necessário contratar um novo domínio: o Hosting fornece um endereço `web.app`. Você poderá conectar um subdomínio do seu domínio atual depois.
+- Endereço: https://lr-capital-crm-v2-2026.web.app
+- Projeto dedicado: `lr-capital-crm-v2-2026`.
+- Firebase Spark, sem conta de cobrança vinculada. Firestore Standard em São Paulo (`southamerica-east1`), banco `(default)`, com franquia gratuita e atualização em tempo real.
+- Acesso pelo botão **Entrar com Google**, usando uma conta autorizada. A conta comercial informada pelo titular foi habilitada como administradora; não foi criada senha.
+- O projeto, site e base anteriores não foram alterados. A prévia local usa seu próprio SQLite e não recebe as alterações feitas online.
 
-Limites gratuitos documentados no momento da consulta:
+A migração inicial copiou 165 clientes, 936 vínculos com instituições, 61 bancos e 80 gerentes, além dos cadastros complementares e históricos disponíveis. Os 1.565 documentos gravados foram conferidos campo a campo, incluindo o membro inicial. Nenhum arquivo de cliente foi colocado no Hosting ou no GitHub. O banco bloqueia consultas sem autenticação e exige membro ativo para a carteira.
 
-| Serviço   | Cota gratuita relevante                                                                               |
-| --------- | ----------------------------------------------------------------------------------------------------- |
-| Hosting   | 10 GB de armazenamento e 10 GB/mês de transferência                                                   |
-| Firestore | 1 GiB de dados, 50 mil leituras/dia, 20 mil gravações/dia, 20 mil exclusões/dia e 10 GiB/mês de saída |
+O arquivo bruto da importação permanece apenas na prévia local. A exportação da interface abrange o estado carregado e não substitui backup completo do banco.
 
-As cotas são limitadas e compartilhadas conforme o projeto. A sincronização gera leituras; abrir sessões e manter vários usuários conectados consome a franquia. Uma gravação nesta aplicação grava a operação e o histórico. Regras que consultam documentos também podem gerar leituras. Se o projeto existente usa Blaze, sua cobrança continua sujeita ao consumo: este guia não muda esse plano.
+## Atualizar a interface publicada
 
-Fontes: [cotas do Hosting](https://firebase.google.com/docs/hosting/usage-quotas-pricing), [preços do Firestore](https://firebase.google.com/docs/firestore/pricing), [planos do Firebase](https://firebase.google.com/pricing).
+Use Node.js 24 e execute os comandos na pasta deste repositório. O login é feito no navegador; não cole códigos ou senhas em arquivos do projeto.
 
-Esta versão não depende de Cloud Functions, Cloud Run ou upload de anexos. Cloud Storage for Firebase requer Blaze atualmente, mesmo com faixas de uso gratuito; não ativar esse recurso esperando garantia de custo zero. [Requisitos de Storage](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024).
-
-A integração automática com OpenAI tem consumo de API separado. A leitura de texto estruturado funciona sem API; a extração de texto livre chama a API somente quando configurada no servidor da prévia e solicitada pelo usuário. A assinatura do ChatGPT não equivale a créditos de API. [Preços da API](https://developers.openai.com/api/docs/pricing).
-
-## 2. Escolher o ambiente
-
-**Opção A — validação em um projeto Spark separado:** mais simples para testar sem interferir no CRM atual. Crie um projeto no console Firebase, sem habilitar cobrança. Crie o Firestore Standard em modo de produção, com banco `(default)`, e registre um aplicativo Web nas configurações do projeto.
-
-**Opção B — aproveitar seu Firebase atual:** utilize um novo site de Hosting e o caminho `lr_v2_workspaces/lr-capital`, que não coincide com as coleções do sistema anterior. Antes de conectar, é necessário ler e combinar as regras existentes. Uma regra ampla como `match /{document=**}` com acesso liberado pode anular a restrição do novo caminho, porque permissões no Firestore são cumulativas. Não substituir as regras existentes pelo arquivo deste repositório: isso pode bloquear o sistema atual. O banco e as funções existentes permanecem sujeitos às próprias configurações.
-
-O arquivo `firebase.json` contém **somente Hosting** para evitar implantar regras por engano. Os comandos abaixo não apontam automaticamente ao site atual.
-
-## 3. Configurar o aplicativo Web
-
-No console Firebase, em Configurações do projeto → Seus aplicativos → aplicativo Web, copie os valores da configuração pública do SDK.
-
-Duplique `public/firebase-config.example.json` como `public/firebase-config.json` e preencha:
-
-```json
-{
-  "apiKey": "CHAVE_PUBLICA_DO_APP_WEB_FIREBASE",
-  "authDomain": "SEU_PROJETO.firebaseapp.com",
-  "projectId": "SEU_PROJETO",
-  "appId": "APP_ID_DO_FIREBASE",
-  "workspaceId": "lr-capital"
-}
-```
-
-Esse arquivo é configuração pública do cliente; a segurança é garantida pela autenticação e pelas regras. Ele não aceita chave privada, arquivo de conta de serviço, senha, token Gmail ou chave OpenAI. Foi excluído do Git para evitar misturar ambientes. O build o copiará para o site.
-
-## 4. Preparar o acesso da equipe
-
-1. Em Authentication → Sign-in method, habilite e-mail/senha.
-2. Crie as contas da equipe no Authentication. O titular deve definir ou receber acesso à senha pelo fluxo apropriado; não registrar senhas em documentos do Firestore ou no código.
-3. Copie o UID de cada conta e crie o documento `lr_v2_workspaces/lr-capital/members/UID_DA_CONTA` com somente os campos:
-
-```json
-{ "name": "Nome da pessoa", "role": "admin", "active": true }
-```
-
-Use `admin`, `editor` ou `reader`. O primeiro administrador precisa ser cadastrado por quem já tem permissão no console Firebase. Uma conta sem documento ativo não entra na carteira. Todos os membros ativos da equipe enxergam a mesma carteira; `reader` não altera dados. Para revogar acesso, altere `active` para `false` no console.
-
-Não há autoinscrição aberta ou senha administrativa embutida.
-
-## 5. Implantar as regras no ambiente escolhido
-
-**Somente em um projeto novo e dedicado à v2**, copie o conteúdo de `firestore.rules` para a aba Regras do Firestore e publique. O arquivo restringe o acesso à equipe e exige histórico junto de cada alteração.
-
-**No projeto existente**, revisar e mesclar as regras primeiro, conferir regras gerais permissivas e testar a aplicação antiga e a nova. Não execute uma substituição integral. É possível revisar esse conjunto por aqui antes da publicação.
-
-Os testes automáticos usam apenas um emulador e dados fictícios. Ainda será necessário validar o login, as permissões reais e duas sessões com o Firebase escolhido antes de carregar a carteira real.
-
-## 6. Publicar em um site separado
-
-Abra o terminal na pasta do novo CRM. Instale Node.js 24 se necessário. Troque `SEU_PROJETO` pelo ID do Firebase e `NOME_UNICO_DO_SITE_V2` por um nome disponível, diferente do site atual.
+Na primeira preparação desta máquina:
 
 ```powershell
 npm ci
 npx firebase-tools@15.31.0 login
-npx firebase-tools@15.31.0 projects:list
-npx firebase-tools@15.31.0 hosting:sites:create NOME_UNICO_DO_SITE_V2 --project SEU_PROJETO
-npx firebase-tools@15.31.0 target:apply hosting lr-v2 NOME_UNICO_DO_SITE_V2 --project SEU_PROJETO
-npm test
-npm run build
-npx firebase-tools@15.31.0 deploy --only hosting:lr-v2 --project SEU_PROJETO
+New-Item -ItemType Directory -Path .local-data -Force
+npx firebase-tools@15.31.0 apps:sdkconfig WEB '1:1073352483145:web:20e757b6f6f4ca4d827a98' --project lr-capital-crm-v2-2026 --out .local-data/firebase-config.json
 ```
 
-O login ocorre no seu navegador. Não é necessário enviar senha ou token nesta conversa. Se o site separado já existir, pule apenas `hosting:sites:create` e aplique o destino ao site correto.
-
-O comando final publica somente a interface no destino `lr-v2`. O endereço será apresentado no resultado. Se aparecer a tela “Conecte o ambiente da equipe”, falta o arquivo `public/firebase-config.json` no build. Preencha, gere novamente e publique.
-
-O servidor de prévia e seu banco local **não são publicados**. O site publicado precisa do Firebase; os exemplos fictícios não são importados automaticamente.
-
-Em Authentication → Settings → Authorized domains, confira o domínio de acesso; inclua o domínio personalizado se for adotado. Não altere os apontamentos do site atual enquanto a v2 estiver em validação.
-
-## 7. Conferir antes de uso real
-
-- Entrar como administrador, editor e leitor. Confirmar que leitor não consegue salvar.
-- Abrir em duas contas/abas: criar uma operação de teste em uma e observar a atualização na outra.
-- Editar a mesma operação nas duas sessões: a edição desatualizada deve ser recusada.
-- Fechar e reabrir: dados e histórico devem continuar presentes.
-- Desativar uma conta de teste e confirmar a perda de acesso.
-- Conferir no Firebase os erros e o consumo de leituras/gravações.
-
-A versão 0.3 importa o pipeline para a carteira operacional, com perfis e instituições por cliente, e deriva bancos/gerentes **somente na prévia local**. A migração para o Firebase continua pendente e deve preservar origem, IDs, valores solicitados/aprovados, responsáveis e relacionamentos, com relatório de conferência. Não copie dados reais para arquivos do GitHub. A exportação da tela é limitada ao conjunto carregado e não substitui backup do banco.
-
-As regras da versão 0.3 incluem `directory` e `directoryEvents`, necessários para as telas de bancos/gerentes. Cadastros individuais são gravados com histórico e versão, e o servidor recusa gerente vinculado a uma instituição inexistente. Antes de atualizar um ambiente Firebase, homologar esse conjunto de regras conforme a seção 5. O arquivo bruto importado para comparação não é publicado nem sincronizado com o Firebase nesta versão.
-
-## 8. Atualizações depois da primeira publicação
-
-Faça alterações no novo repositório, confira a prévia e os testes do GitHub. Depois, com a configuração local preservada:
+Para cada atualização:
 
 ```powershell
-npm ci
 npm test
-npm run build
-npx firebase-tools@15.31.0 deploy --only hosting:lr-v2 --project SEU_PROJETO
+npm run build:hosting
+npx firebase-tools@15.31.0 deploy --only hosting --config firebase.validation.json --project lr-capital-crm-v2-2026
 ```
 
-O Firebase Hosting mantém histórico de versões da interface e permite reverter uma publicação pelo console. Isso não reverte alterações do banco. A automação deste repositório verifica o código; ela não publica automaticamente nem recebe credenciais de produção.
+O comando `build:hosting` valida o projeto e coloca a configuração pública apenas na pasta gerada `dist`. Assim, `npm run dev` continua abrindo a prévia local, sem conectar acidentalmente os testes à carteira compartilhada. A pasta `.local-data` é ignorada pelo Git. Não inserir credenciais de serviço, chaves OpenAI ou senhas nessa configuração.
 
-## Próximo passo para IA automática
+O site usa login com redirecionamento na mesma aba. O domínio `web.app` é também o `authDomain`, evitando depender de pop-ups e armazenamento entre domínios. Os retornos autorizados estão em `firebase.validation.json`. Se houver mudança de domínio, atualizar também a configuração do provedor Google e os domínios autorizados no Authentication.
 
-Adicionar um serviço autenticado que valide o usuário Firebase, consulte apenas a equipe permitida, chame a OpenAI com chave no servidor e devolva propostas estruturadas. Alterações precisam passar pela mesma validação e controle de versão. Envio de mensagens, exclusões e decisões de crédito exigem fluxos próprios de revisão. O custo de modelo e hospedagem desse serviço deve ser definido antes da ativação.
+A integração do GitHub verifica o código e as regras; não publica automaticamente. O Firebase Hosting guarda versões da interface que podem ser revertidas pelo console. Reverter a interface não desfaz edições no banco.
 
-As regras incluem também records e recordEvents para contratos, diagnósticos, simulações e subitens. Após a migração revisada, o administrador pode importar o modelo privado em Contratos → Modelo padrão. A gravação em tempo real entre usuários depende da configuração e homologação do Firebase.
+## Acesso dos sócios
+
+Cada pessoa deve usar sua própria conta Google para que as alterações sejam identificadas. Entrar com Google cria a identidade no Authentication, mas não libera a carteira por si só.
+
+Após a primeira tentativa de entrada da conta autorizada pelo administrador, copie seu UID em Authentication e crie `lr_v2_workspaces/lr-capital/members/UID` com somente:
+
+```json
+{ "name": "Nome da pessoa", "role": "editor", "active": true }
+```
+
+Papéis: `admin`, `editor` e `reader`. O leitor não grava alterações. Para revogar, defina `active` como `false`. Não distribua senha da conta comercial nem crie acesso para e-mails não autorizados. A tela da aplicação ainda não administra convites; esse cadastro é feito no console Firebase.
+
+## Banco e regras
+
+As regras exigem equipe ativa, validação de campos, versão da edição e histórico no mesmo salvamento. Não publicar regras abertas para facilitar login. A atualização inicial da carteira aguarda os seis conjuntos de dados antes de exibir os controles.
+
+Quando houver mudança nas regras, execute os testes do emulador antes de implantar:
+
+```powershell
+npx firebase-tools@15.31.0 emulators:exec --project demo-lr-capital-v2 --config firebase.test.json --only firestore "node --test tests/firestore.rules.integration.mjs"
+npx firebase-tools@15.31.0 deploy --only firestore:rules --config firebase.validation.json --project lr-capital-crm-v2-2026
+```
+
+O emulador exige Java 21. O arquivo `firebase.validation.json` aponta explicitamente para este ambiente novo. Não usar suas regras para substituir as regras do sistema antigo.
+
+## O que é gratuito e os limites atuais
+
+Hosting: 10 GB de armazenamento e 10 GB/mês de transferência. Firestore: 1 GiB, 50 mil leituras/dia e 20 mil gravações/dia, dentro da franquia aplicável. Aberturas da carteira e atualizações em tempo real consomem leituras. Permanecer no Spark evita cobrança variável, mas exceder uma cota pode interromper o serviço; acompanhe o consumo no console.
+
+Fontes oficiais: [Hosting](https://firebase.google.com/docs/hosting/usage-quotas-pricing), [Firestore](https://firebase.google.com/docs/firestore/pricing), [planos](https://firebase.google.com/pricing).
+
+- **Documentos online:** checklist, exigências, conferência, prazos e links de arquivos são compartilhados. O upload binário disponível na prévia continua local. No ambiente gratuito publicado, use links de pastas/arquivos com permissões apropriadas; o sistema não altera essas permissões. Cloud Storage for Firebase requer Blaze e não foi ativado. [Requisitos de Storage](https://firebase.google.com/docs/storage/faqs-storage-changes-announced-sept-2024).
+- **WhatsApp e e-mail:** o sistema prepara a mensagem e abre o aplicativo. A pessoa revisa e conclui o envio; não há disparos em segundo plano, leitura da caixa de mensagens ou cobrança de WhatsApp Business API.
+- **Pedidos do gerente:** sugestões locais por palavras-chave, com revisão obrigatória. Não interpreta sozinho conversas recebidas.
+- **IA automática:** a extração por API disponível no servidor local não é publicada neste Hosting estático. O fluxo assistido e o preenchimento manual continuam disponíveis. Um serviço de IA autenticado e seu orçamento precisam ser configurados separadamente.
+
+## Conferência operacional
+
+Teste a mesma carteira em duas sessões, confira o registro do histórico e a proteção contra edição desatualizada. Cadastros de teste devem ficar separados da carteira real. Para começar o uso da equipe, cadastre os e-mails individuais dos sócios e combine quem confere cada documento e quem registra os retornos das instituições.

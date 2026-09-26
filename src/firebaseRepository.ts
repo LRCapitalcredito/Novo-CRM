@@ -21,6 +21,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import type { Repository } from "./repository";
+import { serviceErrorText } from "./serviceErrors";
 import {invitationInput, type TeamState} from "./team";
 import { assertPlacementFit, needsFitCheck } from "./institutionFit";
 import type { Bank, Manager } from "./directory";
@@ -203,9 +204,9 @@ export function firebaseRepository(config: Config): Repository {
             tx.set(target,{name:data.name,email:data.email,role:data.role,active:true});
             tx.update(inviteRef,{claimedUid:user.uid,version:data.version+1,updatedAt:serverTimestamp(),updatedBy:user.uid});
           });
-        } catch {
+        } catch (e) {
           if(currentGeneration!==generation)return;
-          callback(null,"Não foi possível ativar seu convite. Confira com o administrador o e-mail da conta Google.");
+          callback(null,serviceErrorText(e,"Não foi possível ativar seu convite. Confira com o administrador o e-mail da conta Google."));
           return;
         }
         if(currentGeneration!==generation)return;
@@ -233,9 +234,9 @@ export function firebaseRepository(config: Config): Repository {
             } as Session;
             callback(repo.session);
           },
-          () => {
+          (e) => {
             repo.session = null;
-            callback(null, "Não foi possível verificar o acesso da conta.");
+            callback(null, serviceErrorText(e, "Não foi possível verificar o acesso da conta."));
           },
         );
       });
@@ -272,9 +273,9 @@ export function firebaseRepository(config: Config): Repository {
         // Avoid displaying a partially loaded checklist or institution list.
         if (received.size === 6) next(state);
       };
-      const failed = () =>
+      const failed = (e?: unknown) =>
         error(
-          "Falha ao sincronizar. Confira sua conexão e as permissões da equipe.",
+          serviceErrorText(e, "Falha ao sincronizar. Confira sua conexão e as permissões da equipe."),
         );
       const a = onSnapshot(
         query(collection(db, root, "operations"), orderBy("updatedAt", "desc")),

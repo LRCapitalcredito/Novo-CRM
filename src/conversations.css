@@ -1,5 +1,6 @@
 .message-save,.conversation-history{border-top:1px solid #dce6ee;margin-top:18px;padding-top:18px}
 .message-save>.check-field{margin:14px 0}.message-save>.module-footnote{margin-bottom:0}
+.message-quota-fallback{padding:14px;border:1px solid #e5c999;background:#fff8e9;border-radius:10px;margin:12px 0}.message-quota-fallback p{margin:0 0 12px}.message-quota-fallback a{display:inline-flex;max-width:100%;white-space:normal}
 .conversation-history h3{display:flex;align-items:center;gap:9px}.conversation-history h3 small{padding:3px 9px;background:#e3f2ef;border-radius:20px;color:#226c61}
 .conversation-history details{border:1px solid #dce6ee;border-radius:10px;padding:12px;margin:12px 0}.conversation-history summary{cursor:pointer;font-weight:600;color:#234663}.conversation-history details label{display:grid;gap:6px;margin:12px 0}
 .conversation-list{display:grid;gap:12px;margin-top:15px}.conversation-bubble{padding:15px;background:#f4f8fb;border:1px solid #dce6ee;border-radius:12px}.conversation-bubble.sent_manual{background:#edf8f5;border-color:#cbe9dd}.conversation-bubble.received_manual{background:white;border-left:3px solid #32978d}

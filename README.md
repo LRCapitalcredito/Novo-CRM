@@ -159,3 +159,8 @@ Os cadastros reais, arquivos de conciliação, contatos e catálogo de pastas fi
 - Histórico por cliente e instituição: rascunhos, envio informado e respostas registradas manualmente, com data e responsável. Registros são preservados; editores adicionam e leitores consultam.
 - Salvar e abrir WhatsApp/e-mail persiste o rascunho antes de abrir o aplicativo. O usuário confirma o envio; o CRM não presume entrega ou leitura. Respostas podem ser coladas no histórico.
 - A sincronização automática e o envio pela plataforma oficial do WhatsApp ainda não estão conectados. Nenhuma captura de conversas do WhatsApp Web é realizada.
+
+## Versão 0.10.1 — limite de uso
+
+Falhas de cota do Firestore exibem orientação em português. Ao falhar o salvamento de uma mensagem por cota, a equipe pode abrir o aplicativo sem salvar, com aviso explícito de que não há registro no histórico. A opção respeita a revisão vigente e não transforma o clique em confirmação de envio. Falhas de permissão não liberam essa alternativa. A interface não altera o plano contratado nem renova a cota do serviço.
+

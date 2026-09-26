@@ -7,15 +7,17 @@ import type { Operation } from "./domain";
 import { celular } from "./brFormats";
 import { localDateTime, messageStatuses, type MessageChannel, type MessageStatus } from "./conversations";
 import { whatsappMessageUrl, emailMessageUrl } from "./clientFlow";
+import { isQuotaError, messageSaveError } from "./serviceErrors";
 import "./conversations.css";
 
 type Props={op:Operation;records:WorkspaceRecord[];repo:Repository;canEdit:boolean;notify:(s:string)=>void};
 type Recipient={channel:MessageChannel;recipient:string;recipientName:string;placementId?:string};
-const errorText=(e:unknown)=>e instanceof Error?e.message:"Não foi possível salvar a mensagem.";
+const errorText=messageSaveError;
 
 export function SavedMessageActions({op,repo,canEdit,notify,channel,recipient,recipientName,placementId="",body,subject="",ready}:Omit<Props,"records">&Recipient&{body:string;subject?:string;ready:boolean}) {
   const [busy,setBusy]=useState(false),[confirmed,setConfirmed]=useState(false),[error,setError]=useState(""),[savedKey,setSavedKey]=useState("");
   const working=useRef(false);
+  const [quotaBlocked,setQuotaBlocked]=useState(false);
   const fingerprint=JSON.stringify([body,subject,recipient,placementId,channel]);
   const url=channel==="WhatsApp"?whatsappMessageUrl(recipient,body):emailMessageUrl(recipient,subject,body);
   const [confirmationKey,setConfirmationKey]=useState("");
@@ -23,7 +25,7 @@ export function SavedMessageActions({op,repo,canEdit,notify,channel,recipient,re
   async function save(status:MessageStatus,open=false) {
     if(working.current||!canEdit||!ready||!body.trim())return;
     if(status==="sent_manual"&&!sendConfirmed)return;
-    working.current=true;setBusy(true);setError("");
+    working.current=true;setBusy(true);setError("");setQuotaBlocked(false);
     // Reserve a tab during the click; navigating happens only after the draft has been saved.
     const tab=open&&url?window.open("about:blank","_blank"):null;
     if(tab)tab.opener=null;
@@ -33,13 +35,14 @@ export function SavedMessageActions({op,repo,canEdit,notify,channel,recipient,re
       notify(status==="draft"?"Rascunho salvo no histórico. O envio ainda não foi confirmado.":"Envio informado registrado no histórico.");
       if(open&&url){if(tab)tab.location.href=url;else setError("Rascunho salvo. O navegador bloqueou a nova aba; use o link abaixo.");}
       setConfirmed(false);
-    } catch(e){tab?.close();setError(errorText(e));}finally{working.current=false;setBusy(false);}
+    } catch(e){tab?.close();setError(errorText(e));setQuotaBlocked(isQuotaError(e));}finally{working.current=false;setBusy(false);}
   }
   return <section className="message-save"><div className="module-actions"><button type="button" disabled={!canEdit||!ready||!body.trim()||busy} onClick={()=>void save("draft")}><Save size={14}/> Salvar rascunho</button><button type="button" className="primary" disabled={!canEdit||!ready||!url||!body.trim()||busy} onClick={()=>void save("draft",true)}>Salvar e abrir {channel} ↗</button></div>
     <label className="check-field"><input type="checkbox" checked={sendConfirmed} disabled={!canEdit||!ready||busy} onChange={e=>{setConfirmed(e.target.checked);setConfirmationKey(fingerprint);}}/> Confirmo que enviei esta mensagem pelo {channel}.</label>
     <button type="button" disabled={!canEdit||!ready||!sendConfirmed||busy||savedKey==="sent_manual"+fingerprint} onClick={()=>void save("sent_manual")}>Registrar envio realizado</button>
-    {error&&<p role="alert" className="module-error">{error} {url&&savedKey==="draft"+fingerprint&&<a href={url} target="_blank" rel="noreferrer">Abrir {channel} ↗</a>}</p>}
-    <p className="module-footnote">O rascunho e a confirmação ficam salvos para a equipe. Abrir o aplicativo não comprova envio, entrega ou leitura.</p>
+    {error&&<p role="alert" className="module-error">{error} {url&&ready&&!busy&&savedKey==="draft"+fingerprint&&<a href={url} target="_blank" rel="noreferrer">Abrir {channel} ↗</a>}</p>}
+    {quotaBlocked&&canEdit&&ready&&url&&body.trim()&&!busy&&<div className="message-quota-fallback"><p>Ao continuar, esta ação não salva a mensagem no CRM nem confirma o envio.</p><a className="button" href={url} target="_blank" rel="noreferrer">Abrir {channel} sem salvar no CRM ↗</a></div>}
+    <p className="module-footnote">{quotaBlocked?"O histórico será atualizado somente após um salvamento bem-sucedido. ":"O rascunho e a confirmação ficam salvos para a equipe. "}Abrir o aplicativo não comprova envio, entrega ou leitura.</p>
   </section>;
 }
 

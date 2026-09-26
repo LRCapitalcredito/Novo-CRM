@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
+import { assertPlacementFit, needsFitCheck } from "../src/institutionFit";
 import { inspectDocumentFile } from "./documentFiles";
 import { isWorkflowKind, validateWorkflowLinks, type DocumentFile } from "../src/workflow";
 import {
@@ -80,6 +81,11 @@ export function createRecordStore(db: DatabaseSync) {
             throw new Error(
               "O gerente precisa pertencer à instituição vinculada.",
             );
+        }
+        if (needsFitCheck(input, old)) {
+          const readDirectory = (id: string) => { const row = db.prepare("SELECT data FROM directory WHERE id=?").get(id); return row ? JSON.parse(String(row.data)) : undefined; };
+          const row = db.prepare("SELECT data FROM operations WHERE id=?").get(input.operationId)!;
+          assertPlacementFit(input, old, JSON.parse(String(row.data)), get(`profile-${input.operationId}`)?.data ?? {}, readDirectory(input.data.bankId), readDirectory(input.data.managerId));
         }
         const at = new Date().toISOString();
         const next = {

@@ -20,6 +20,8 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import type { Repository } from "./repository";
+import { assertPlacementFit, needsFitCheck } from "./institutionFit";
+import type { Bank, Manager } from "./directory";
 import { isWorkflowKind, validateWorkflowLinks } from "./workflow";
 import {
   validateRecord,
@@ -107,6 +109,13 @@ export function firebaseRepository(config: Config): Repository {
           }
         }
         const oldRecord = old ? { ...old, data: JSON.parse(old.contentJson) } as WorkspaceRecord : null;
+        if (needsFitCheck(input, oldRecord)) {
+          const op = await tx.get(doc(db, root, "operations", input.operationId));
+          const profile = await tx.get(doc(db, root, "records", `profile-${input.operationId}`));
+          const bank = input.data.bankId ? await tx.get(doc(db, root, "directory", input.data.bankId)) : null;
+          const manager = input.data.managerId ? await tx.get(doc(db, root, "directory", input.data.managerId)) : null;
+          assertPlacementFit(input, oldRecord, op.data() as Operation, profile.exists() ? JSON.parse(profile.data().contentJson) : {}, bank?.data() as Bank | undefined, manager?.data() as Manager | undefined);
+        }
         const relatedIds = [input.data.placementId, ...(input.kind === "dispatch" && !old ? input.data.items.map((item: any) => item.documentId) : [])].filter(Boolean);
         const related: WorkspaceRecord[] = [];
         for (const id of new Set<string>(relatedIds)) {

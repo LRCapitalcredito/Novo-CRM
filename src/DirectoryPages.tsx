@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import { BankLogo } from "./BankLogo";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Archive,
@@ -66,24 +68,7 @@ const fieldNames: Record<string, string> = {
   source: "origem",
   archived: "arquivamento",
 };
-function BankMark({ bank }: { bank: Bank }) {
-  return (
-    <span className="bank-mark" style={{ background: bank.color }}>
-      {bank.logoUrl ? (
-        <img
-          src={bank.logoUrl}
-          alt=""
-          referrerPolicy="no-referrer"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-          }}
-        />
-      ) : (
-        bank.name.slice(0, 2).toUpperCase()
-      )}
-    </span>
-  );
-}
+const BankMark = BankLogo;
 function sourceText(record: DirectoryRecord) {
   return record.source === "Vínculo do pipeline importado"
     ? "Dados a completar"
@@ -575,10 +560,10 @@ export function Drawer({
         const first = nodes[0],
           last = nodes.at(-1);
         if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
+          e.preventDefault(); e.stopPropagation();
           last?.focus();
         } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
+          e.preventDefault(); e.stopPropagation();
           first?.focus();
         }
       }
@@ -590,7 +575,7 @@ export function Drawer({
       previous?.focus();
     };
   }, []);
-  return (
+  return createPortal(
     <div className="modal-overlay">
       <div
         className="directory-drawer"
@@ -614,10 +599,11 @@ export function Drawer({
         </header>
         {children}
       </div>
-    </div>
+    </div>, document.body
   );
 }
-function DirectoryEditor({
+export function DirectoryEditor({
+  confirmationRequired = false,
   record,
   banks,
   events,
@@ -625,6 +611,7 @@ function DirectoryEditor({
   close,
   save,
 }: {
+  confirmationRequired?: boolean;
   record: DirectoryRecord | DirectoryInput;
   banks: Bank[];
   events: DirectoryState["events"];
@@ -633,7 +620,7 @@ function DirectoryEditor({
   save: (r: DirectoryInput) => Promise<void>;
 }) {
   const [form, setForm] = useState<any>(() =>
-      JSON.parse(JSON.stringify(record)),
+      ({...JSON.parse(JSON.stringify(record)), ...(confirmationRequired ? {source:""} : {})}),
     ),
     [min, setMin] = useState(
       record.kind === "manager" ? amountInput(record.minRevenueCents) : "",
@@ -644,6 +631,7 @@ function DirectoryEditor({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [history, setHistory] = useState(false);
+  const [segmentsText, setSegmentsText] = useState(record.kind === "manager" ? (record.targetSegments || []).join("; ") : "");
   const set = (key: string, value: unknown) =>
     setForm((old: any) => ({ ...old, [key]: value }));
   const field =
@@ -707,7 +695,7 @@ function DirectoryEditor({
       ) : (
         <form
           onSubmit={async (e) => {
-            e.preventDefault();
+            e.preventDefault(); e.stopPropagation();
             setBusy(true);
             setError("");
             try {
@@ -717,6 +705,7 @@ function DirectoryEditor({
                   ? {
                       minRevenueCents: parseMoney(min),
                       maxRevenueCents: parseMoney(max),
+                      targetSegments: segmentsText.split(";").map(s => s.trim()).filter(Boolean),
                     }
                   : {}),
               });
@@ -1008,11 +997,14 @@ function DirectoryEditor({
                     )}
                   </>
                 )}
+                {form.kind === "manager" && <label className="span2">Segmentos atendidos (separados por ponto e vírgula)<input value={segmentsText} onChange={e => setSegmentsText(e.target.value)} placeholder="Vazio: sem filtro de segmento cadastrado" maxLength={3600}/></label>}
                 <label className="span2">
                   Origem / confirmação
                   <input
                     maxLength={300}
                     value={form.source}
+                    required={confirmationRequired}
+                    placeholder="Nome de quem confirmou a política e data"
                     onChange={field("source")}
                   />
                 </label>

@@ -1,22 +1,7 @@
 import { parseMoney } from "./domain";
 
-export const warrantyKinds = [
-  "Imóveis (Geral)",
-  "Imóvel Urbano",
-  "Imóvel Rural",
-  "Imóvel Operacional",
-  "Veículos Leves",
-  "Veículos Pesados",
-  "Recebíveis",
-  "Contratos",
-  "Aplicação Financeira",
-  "Aval / Fiador",
-  "Estoque",
-  "FGI / Limpa",
-  "Safra",
-  "Câmbio",
-  "Universal",
-] as const;
+import { warrantyKinds } from "./warrantyKinds";
+export { warrantyKinds };
 export const statesBR = [
   "AC",
   "AL",
@@ -88,6 +73,7 @@ export type Manager = Base & {
   serviceScope: keyof typeof scopes;
   radiusKm: number | null;
   servedStates: string[];
+  targetSegments?: string[];
 };
 export type DirectoryRecord = Bank | Manager;
 export type DirectoryInput =
@@ -123,7 +109,7 @@ export const emptyDirectory: DirectoryState = {
   events: [],
   imports: [],
 };
-export function newBank(): DirectoryInput {
+export function newBank(): Extract<DirectoryInput, {kind: "bank"}> {
   return {
     id: crypto.randomUUID(),
     kind: "bank",
@@ -138,7 +124,7 @@ export function newBank(): DirectoryInput {
     archived: false,
   };
 }
-export function newManager(bankId = ""): DirectoryInput {
+export function newManager(bankId = ""): Extract<DirectoryInput, {kind: "manager"}> {
   return {
     id: crypto.randomUUID(),
     kind: "manager",
@@ -248,6 +234,7 @@ export function validateDirectory(raw: unknown): DirectoryInput {
   const minRevenueCents = number(raw.minRevenueCents, 1e15, true),
     maxRevenueCents = number(raw.maxRevenueCents, 1e15, true),
     radiusKm = number(raw.radiusKm, 20000);
+  if (raw.targetSegments !== undefined && (!Array.isArray(raw.targetSegments) || raw.targetSegments.length > 30 || raw.targetSegments.some((s: unknown) => typeof s !== "string" || !s.trim() || s.length > 120))) throw new Error("Segmentos de atuação inválidos.");
   if (
     minRevenueCents !== null &&
     maxRevenueCents !== null &&
@@ -269,6 +256,7 @@ export function validateDirectory(raw: unknown): DirectoryInput {
     serviceScope: raw.serviceScope,
     radiusKm,
     servedStates: [...new Set(raw.servedStates)] as string[],
+    ...(raw.targetSegments !== undefined ? {targetSegments: [...new Set<string>(raw.targetSegments.map((s: string) => s.trim()))]} : {}),
     minRevenueCents,
     maxRevenueCents,
   };

@@ -1,3 +1,7 @@
+import { BankLogo } from "./BankLogo";
+import { CopyCnpj, DriveActions, ManagerContact } from "./ClientResources";
+import { InstitutionFitPanel, ClientCriteriaEditor } from "./InstitutionFitPanel";
+import { institutionFit, needsFitCheck, placementStatuses } from "./institutionFit";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
@@ -28,7 +32,7 @@ import {
   type Operation,
   type WorkspaceState,
 } from "./domain";
-import { type Bank, type Manager, whatsappUrl, statesBR } from "./directory";
+import { type Bank, type Manager, statesBR } from "./directory";
 import { Drawer } from "./DirectoryPages";
 import {
   findRecord,
@@ -78,6 +82,7 @@ export function ClientPortfolio({
     } | null>(null);
   const records = state.records ?? [],
     placements = records.filter((r) => r.kind === "placement");
+  const [criteriaClient, setCriteriaClient] = useState<Operation | null>(null);
   const [date, setDate] = useState(today);
   useEffect(() => { const timer = setInterval(() => setDate(today()), 60000); return () => clearInterval(timer); }, []);
   const index = useMemo(() => portfolioIndex(state, date), [state, date]);
@@ -249,13 +254,13 @@ export function ClientPortfolio({
                   <span>
                     <strong>{op.company}</strong>
                     <small>
-                      {op.cnpj || "Documento a completar"} · {links.length}{" "}
+                      {links.length}{" "}
                       instituições
                     </small>
                     <small>{minimumChecklist(op,records).complete?"✓ Mínimo documental conferido":"○ Mínimo documental: "+minimumChecklist(op,records).done+"/"+minimumChecklist(op,records).total} · {documents.filter((r)=>pendingDocument(r)).length} pendências registradas</small>
                   </span>
                 </button>
-                <ContactButtons op={op} records={records} notify={notify}/></div>
+                <CopyCnpj cnpj={op.cnpj} notify={notify}/><ContactButtons op={op} records={records} notify={notify}/><DriveActions op={op} state={state} repo={repo} canEdit={canEdit} notify={notify}/></div>
                 <div data-label="Etapa">
                   <InlineOperationControls op={op} repo={repo} canEdit={canEdit} notify={notify} />
                   <ClientClassification op={op} state={state} repo={repo} canEdit={canEdit} notify={notify}/>
@@ -274,6 +279,7 @@ export function ClientPortfolio({
               {expanded === op.id && (
                 <div className="client-expanded">
                   <div className="module-actions">
+                    <button onClick={() => setCriteriaClient(op)}>Garantias e direcionamento</button>
                     <button className="primary" onClick={() => onModule("workflow", op.id)}><FolderOpen size={15} /> Documentos e acompanhamento</button>
                     <button onClick={() => onEdit(op)}>
                       <Settings2 size={15} /> Dados do cliente
@@ -304,7 +310,7 @@ export function ClientPortfolio({
                       Revisar cadastro: {profile?.data.importIssues.join(" · ")}
                     </p>
                   )}
-                  <InstitutionList
+                  <InstitutionList repo={repo} notify={notify}
                     op={op}
                     links={links}
                     state={state}
@@ -330,6 +336,7 @@ export function ClientPortfolio({
         {rows.length} clientes nesta seleção. Os valores e códigos sem definição
         na base original permanecem sinalizados para conferência.
       </p>
+      {criteriaClient && <ClientCriteriaEditor op={state.operations.find(o => o.id === criteriaClient.id) || criteriaClient} state={state} repo={repo} canEdit={canEdit} notify={notify} close={() => setCriteriaClient(null)}/>}
       {editing && (
         <RecordEditor
           key={editing.record?.id ?? editing.op.id + editing.kind}
@@ -345,6 +352,7 @@ export function ClientPortfolio({
   );
 }
 function InstitutionList({
+  repo, notify,
   op,
   links,
   state,
@@ -352,6 +360,7 @@ function InstitutionList({
   onEdit,
 }: {
   op: Operation;
+  repo: Repository; notify: (s:string) => void;
   links: WorkspaceRecord[];
   state: WorkspaceState;
   canEdit: boolean;
@@ -411,28 +420,16 @@ function InstitutionList({
               return (
                 <tr key={r.id}>
                   <td>
-                    <strong>{d.institution || "A identificar"}</strong>
+                    <div className="institution-identity"><BankLogo bank={state.directory?.records.find(x => x.id === d.bankId && x.kind === "bank") as Bank | undefined} name={d.institution}/><strong>{d.institution || "A identificar"}</strong></div>
                     <small>{d.active ? "Em atuação" : "Fora de atuação"}</small>
                   </td>
                   <td>
-                    <span className={`pill status-${stageTone(d.status || "")}`}>
-                      {/^\d+$/.test(d.status)
-                        ? "Código original: " + d.status
-                        : d.status || "Não informado"}
-                    </span>
+                    <PlacementStatus record={r} repo={repo} canEdit={canEdit} notify={notify}/>
+                    <FitSummary op={op} state={state} record={r} onOpen={() => onEdit(r)}/>
                   </td>
                   <td>
                     {m?.name || d.manager || "Não informado"}
-                    {m?.phone && (
-                      <a
-                        className="contact-link"
-                        target="_blank"
-                        rel="noreferrer"
-                        href={whatsappUrl(m.phone) || undefined}
-                      >
-                        {m.phone}
-                      </a>
-                    )}
+                    <ManagerContact op={op} placement={r} state={state} repo={repo} canEdit={canEdit} notify={notify}/>
                   </td>
                   <td>
                     {d.product || "Não informada"}
@@ -530,6 +527,17 @@ export function RecordEditor({
         ? ""
         : String(data.approvedCents / 100).replace(".", ","),
     );
+  const currentOp = state.operations.find(o => o.id === op.id) || op;
+  const currentProfile = findRecord(state.records ?? [], "profile", op.id)?.data ?? {};
+  const rank = {compatible:0,pending:1,conflict:2};
+  const rankedBanks = banks.map(bank => {
+    const candidates = (state.directory?.records ?? []).filter(r => r.kind === "manager" && r.bankId === bank.id && !r.archived) as Manager[];
+    const fits = (candidates.length ? candidates : [undefined]).map(manager => institutionFit(currentOp,currentProfile,bank,manager));
+    const best = fits.sort((a,b) => rank[a.status]-rank[b.status] || a.issues.length-b.issues.length)[0];
+    return {bank,fit:best};
+  }).sort((a,b) => rank[a.fit.status]-rank[b.fit.status] || a.bank.name.localeCompare(b.bank.name,"pt-BR"));
+  const fit = institutionFit(currentOp, findRecord(state.records ?? [], "profile", op.id)?.data ?? {}, banks.find(b => b.id === data.bankId), managers.find(m => m.id === data.managerId), data);
+  const blocked = kind === "placement" && needsFitCheck(recordInput("placement", op.id, data, record?.id), record) && (!data.bankId || fit.conflicts.length > 0);
   const f =
     (k: string) =>
     (
@@ -550,7 +558,7 @@ export function RecordEditor({
       <form
         className="module-form"
         onSubmit={async (e) => {
-          e.preventDefault();
+          e.preventDefault(); e.stopPropagation();
           setBusy(true);
           setError("");
           try {
@@ -631,9 +639,9 @@ export function RecordEditor({
                   }
                 >
                   <option value="">Selecionar instituição</option>
-                  {banks.map((b) => (
+                  {rankedBanks.map(({bank:b,fit}) => (
                     <option key={b.id} value={b.id}>
-                      {b.name}
+                      {b.name} · {fit.label}
                     </option>
                   ))}
                 </select>
@@ -655,11 +663,12 @@ export function RecordEditor({
                   <option value="">Não informado</option>
                   {managers.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name}
+                      {m.name} · {institutionFit(currentOp,currentProfile,banks.find(b=>b.id===data.bankId),m,data).label}
                     </option>
                   ))}
                 </select>
               </label>
+              <InstitutionFitPanel op={currentOp} state={state} repo={repo} canEdit={canEdit} notify={notify} data={data} change={setData}/>
               <label>
                 Status
                 <input
@@ -760,7 +769,7 @@ export function RecordEditor({
           <button type="button" onClick={close}>
             Fechar
           </button>
-          <button className="primary" disabled={busy || !canEdit}>
+          <button className="primary" disabled={busy || !canEdit || blocked}>
             Salvar dados
           </button>
         </div>
@@ -787,4 +796,14 @@ export function RecordEditor({
       </form>
     </Drawer>
   );
+}
+
+function PlacementStatus({record,repo,canEdit,notify}:{record:WorkspaceRecord;repo:Repository;canEdit:boolean;notify:(s:string)=>void}) {
+  const [busy,setBusy] = useState(false), [error,setError] = useState("");
+  const save = async (data:Record<string,any>) => {setBusy(true);setError("");try {await repo.saveRecord({...record,data},record.version);notify("Atuação atualizada.");} catch(e) {setError(err(e));}finally{setBusy(false);}};
+  return <div className="placement-inline"><select aria-label={"Status em " + record.data.institution} className={"status-"+stageTone(record.data.status)} disabled={!canEdit || busy} value={record.data.status} onChange={e => {const status=e.target.value;void save({...record.data,status,...(["Negado","Parado","Perdido","Liberado"].includes(status)?{active:false}:{})});}}>{[...new Set([record.data.status,...placementStatuses])].filter(Boolean).map(s => <option key={s}>{s}</option>)}</select><label><input type="checkbox" checked={record.data.active} disabled={!canEdit || busy} onChange={e => void save({...record.data,active:e.target.checked})}/> Em atuação</label>{error&&<p role="alert" className="module-error">{error}</p>}</div>;
+}
+function FitSummary({op,state,record,onOpen}:{op:Operation;state:WorkspaceState;record:WorkspaceRecord;onOpen:()=>void}) {
+ const fit=institutionFit(op,findRecord(state.records??[],"profile",op.id)?.data??{},state.directory?.records.find(r=>r.id===record.data.bankId&&r.kind==="bank") as Bank|undefined,state.directory?.records.find(r=>r.id===record.data.managerId&&r.kind==="manager") as Manager|undefined,record.data);
+ return <button className={"fit-summary "+fit.status} onClick={onOpen} title={fit.issues.map(i=>i.message).join("\n")}>{fit.status==="conflict"?"⚠ ":fit.status==="compatible"?"✓ ":"○ "}{fit.label}</button>;
 }

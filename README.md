@@ -1,10 +1,18 @@
 # LR Capital · Novo CRM
 
-Versão 0.7: carteira, atuação por instituição, bancos, gerentes, contratos, simulador, diagnóstico financeiro e acompanhamento documental. React + TypeScript; prévia independente com SQLite; ambiente compartilhado com Firebase. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
+Versão 0.8: carteira, atuação por instituição, bancos, gerentes, contratos, simulador, diagnóstico financeiro e acompanhamento documental. React + TypeScript; prévia independente com SQLite; ambiente compartilhado com Firebase. Este repositório contém código, imagens institucionais e testes fictícios. Carteira real, PDFs recebidos, modelo privado de contrato e credenciais ficam fora do Git.
 
 Ambiente de validação: https://lr-capital-crm-v2-2026.web.app — login Google e autorização por membro da equipe. Consulte [PUBLICAR.md](PUBLICAR.md) para atualizações. O sistema anterior permanece independente.
 
 ### Contatos, documentação e atuação
+
+- Status e atuação da instituição editáveis na linha, com controle de versão. Encerrar/pausar continua possível em vínculos antigos com divergências; reativar exige nova conferência.
+- Logos fornecidas pela equipe em `public/institutions`, com nomes e aliases explícitos. CNPJ copiável sem pontuação e pesquisável nos dois formatos.
+- Pasta do Google Drive por cliente, com validação do endereço e confirmação de identidade. Sugestões privadas podem ser armazenadas no perfil; não há sincronização contínua nem leitura automática dos arquivos. As permissões do Drive são preservadas.
+- WhatsApp do gerente com saudação, cliente, CNPJ e pasta atual. Exige revisão antes de abrir a conversa, bloqueia o encaminhamento pela interface quando existem divergências e não registra envio presumido.
+- Conferência de garantias, restrições, faturamento anual, cidade/UF, raio informado e segmentos do gerente. Instituições sem divergência aparecem primeiro no seletor. Ausências permanecem “Dados a confirmar”; não são aprovação ou política presumida.
+- Novos vínculos, trocas de instituição/gerente e reativações com incompatibilidade comprovada são recusados. O fluxo oferece correção do cliente, da política do banco ou do target do gerente; revisão da política exige registrar a origem da confirmação. Um raio entre cidades precisa de distância e fonte explícitas.
+- A regra comercial roda na interface, na transação SQLite e na transação do repositório Firebase, relendo os dados atuais. As regras Firestore protegem acesso, versão e auditoria; não interpretam o JSON comercial. Portanto, a validação comercial não é uma barreira contra clientes SDK modificados por membros autorizados. Critérios seguem os cadastros da equipe, sem consulta automática a políticas oficiais de bancos.
 
 - WhatsApp e e-mail na carteira e no acompanhamento: revise uma mensagem casual já preparada com os documentos que faltam. O envio final acontece no aplicativo escolhido; abrir a conversa não registra um envio fictício.
 - Documentação mínima conforme as frentes do cliente. Itens recebidos ainda precisam ser conferidos; dispensas exigem justificativa. A falta de checklist não produz um indicador de documentação completa.
@@ -72,7 +80,7 @@ Uma instalação nova começa vazia. **Base recebida → Importar JSON** valida 
 - Diagnóstico de 11 páginas em paisagem baseado nas seções do modelo recebido. Preenchimento manual, texto estruturado, indicadores derivados e faturamentos mensais. Ausências ficam como desconhecidas. Não aprova crédito nem classifica solvência automaticamente.
 - Leitor PDF interno com navegação e texto acessível. Documentos são carregados sob demanda.
 - Persistência, histórico e controle de versão também para documentos/subitens; edições concorrentes desatualizadas são recusadas.
-- Firebase Authentication/Firestore preparados para admin/editor/reader da mesma equipe. Configuração, migração e homologação do projeto real ainda são necessárias.
+- Firebase Authentication/Firestore com acesso admin/editor/reader da mesma equipe no ambiente compartilhado. Novos membros precisam ser autorizados pelo administrador.
 
 ## Diagnóstico por texto e IA
 

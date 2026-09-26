@@ -4,6 +4,8 @@ import { narrativeFields, numericFields } from "./diagnosis";
 import { validateDeal } from "./deals";
 import { validateClientProfile } from "./clientFlow";
 import { validateWorkflow } from "./workflow";
+import { validateFitProfile } from "./institutionFit";
+import { validateDriveProfile } from "./clientDrive";
 export type RecordKind =
   | "profile"
   | "placement"
@@ -64,6 +66,8 @@ export function validateRecord(raw: any): RecordInput {
   )
     throw new Error("Cadastro complementar inválido.");
   if (raw.kind === "placement") {
+    if (raw.data.distanceKm !== undefined && raw.data.distanceKm !== null && (typeof raw.data.distanceKm !== "number" || !Number.isFinite(raw.data.distanceKm) || raw.data.distanceKm < 0 || raw.data.distanceKm > 20000)) throw Error("Distância inválida.");
+    for (const key of ["distanceSource", "distanceContext"]) if (raw.data[key] !== undefined && (typeof raw.data[key] !== "string" || raw.data[key].length > 2000)) throw Error("Confirmação de distância inválida.");
     if (raw.data.deal !== undefined) validateDeal(raw.data.deal);
     for (const key of [
       "bankId",
@@ -108,6 +112,8 @@ export function validateRecord(raw: any): RecordInput {
   if (raw.kind === "profile") {
     for (const k of ["address", "city", "state", "segment"]) text(k, 500);
     validateClientProfile(d);
+    validateFitProfile(d);
+    validateDriveProfile(d);
   }
   if (raw.kind === "contract") {
     for (const k of [

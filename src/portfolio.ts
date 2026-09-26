@@ -32,7 +32,7 @@ export function portfolioIndex(state: WorkspaceState, date = today()) {
     // Datas de atualização não representam compromissos. Somente prazos explícitos.
     const dates = isWorking(operation) ? (datesByClient.get(operation.id) ?? []).sort() : [];
     return { operation, links, tracks: activeTracks(operation, state.records ?? []), nextDue: dates[0] ?? "", late: dates.some((d) => d < date), dueToday: dates.includes(date), unscheduled: isWorking(operation) && dates.length === 0,
-      search: normalizeSearch([operation.company, operation.cnpj, operation.owner, operation.nextAction, operation.contact, ...links.flatMap((r) => [r.data.institution, r.data.manager])].join(" ")) };
+      search: normalizeSearch([operation.company, operation.cnpj, operation.cnpj.replace(/[^a-zA-Z0-9]/g, ""), operation.owner, operation.nextAction, operation.contact, ...links.flatMap((r) => [r.data.institution, r.data.manager])].join(" ")) };
   });
 }
 export type PortfolioEntry = ReturnType<typeof portfolioIndex>[number];

@@ -1,0 +1,17 @@
+export const warrantyKinds = [
+  "Imóveis (Geral)",
+  "Imóvel Urbano",
+  "Imóvel Rural",
+  "Imóvel Operacional",
+  "Veículos Leves",
+  "Veículos Pesados",
+  "Recebíveis",
+  "Contratos",
+  "Aplicação Financeira",
+  "Aval / Fiador",
+  "Estoque",
+  "FGI / Limpa",
+  "Safra",
+  "Câmbio",
+  "Universal",
+] as const;

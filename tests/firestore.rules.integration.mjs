@@ -149,6 +149,14 @@ test("bancos e gerentes são vinculados, auditados e podem ser arquivados", asyn
     getDoc(doc(dbFor("reader"), `${root}/directory/manager-test`)),
   );
 });
+
+test("segmentos opcionais do gerente aceitam texto limitado e recusam tipos ou listas inválidas", async () => {
+  const db = dbFor();
+  await assertSucceeds(writeDirectory(db, bankInput));
+  for (const targetSegments of [[2], [""], ["x".repeat(121)], Array(31).fill("Indústria")])
+    await assertFails(writeDirectory(db, {...managerInput,targetSegments}));
+  await assertSucceeds(writeDirectory(db, {...managerInput,targetSegments:["Indústria","Serviços"]}));
+});
 test("cadastros recusam leitor, banco ausente e histórico falso", async () => {
   await assertFails(writeDirectory(dbFor("reader"), bankInput));
   await assertFails(writeDirectory(dbFor(), managerInput));

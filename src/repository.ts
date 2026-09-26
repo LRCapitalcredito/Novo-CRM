@@ -19,8 +19,9 @@ export interface Repository {
   readImport?(id: string): Promise<LegacyDataset>;
   mode: "preview" | "firebase";
   session: Session | null;
+  retryAccess?(): Promise<void>;
   authListener(
-    callback: (session: Session | null, error?: string) => void,
+    callback: import("./authAccess").AccessCallback,
   ): () => void;
   login(email: string, password: string): Promise<void>;
   loginGoogle?(): Promise<void>;

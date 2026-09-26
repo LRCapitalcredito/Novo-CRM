@@ -38,6 +38,8 @@ import {
   PanelLeftClose,
 } from "lucide-react";
 import { createRepository, type Repository } from "./repository";
+import type { AccessState } from "./authAccess";
+import { AccessStatus } from "./AccessStatus";
 import {
   stages,
   products,
@@ -139,6 +141,8 @@ function App() {
   const [page, setPage] = useState<Page>("operations");
   const [error, setError] = useState("");
   const [authError, setAuthError] = useState("");
+  const [access, setAccess] = useState<AccessState>();
+  const [authReady, setAuthReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
@@ -156,9 +160,11 @@ function App() {
         if (!active) return;
         setRepo(r);
         if (r)
-          stop = r.authListener((u, msg) => {
+          stop = r.authListener((u, msg, status) => {
             setSession(u);
             setAuthError(msg || "");
+            setAccess(status);
+            setAuthReady(true);
           });
       })
       .catch((e) => setError(errorText(e)));
@@ -178,7 +184,7 @@ function App() {
       setLoaded(true);
       setError("");
     }, setError);
-  }, [repo, session]);
+  }, [repo, session?.uid, session?.role]);
   useEffect(() => {
     if (!notice) return;
     const t = setTimeout(() => setNotice(""), 4200);
@@ -255,7 +261,8 @@ function App() {
         </div>
       </div>
     );
-  if (!session) return <Login repo={repo} error={authError} />;
+  if (!authReady) return <div className="center-screen" role="status"><Brand /><LoaderCircle className="spin" /><p>Verificando sua sessão…</p></div>;
+  if (!session) return <Login repo={repo} error={authError} access={access} />;
   return (
     <div className="app-shell">
       {mobileNav && (
@@ -817,7 +824,7 @@ function Empty({
     </div>
   );
 }
-function Login({ repo, error }: { repo: Repository; error: string }) {
+function Login({ repo, error, access }: { repo: Repository; error: string; access?: AccessState }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -839,7 +846,7 @@ function Login({ repo, error }: { repo: Repository; error: string }) {
         <small>LR Capital · Consultoria e Crédito</small>
       </section>
       <main>
-        <form
+        {access ? <AccessStatus repo={repo} access={access} error={error} /> : <form
           onSubmit={async (e) => {
             e.preventDefault();
             setBusy(true);
@@ -893,7 +900,7 @@ function Login({ repo, error }: { repo: Repository; error: string }) {
             </div>
           )}
           <small>Precisa de acesso? Fale com o administrador da equipe.</small>
-        </form>
+        </form>}
       </main>
     </div>
   );

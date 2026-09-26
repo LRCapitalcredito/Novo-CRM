@@ -22,6 +22,7 @@ import {
 } from "firebase/firestore";
 import type { Repository } from "./repository";
 import { serviceErrorText } from "./serviceErrors";
+import { createAccessController, type AccessProfile } from "./authAccess";
 import {invitationInput, type TeamState} from "./team";
 import { assertPlacementFit, needsFitCheck } from "./institutionFit";
 import type { Bank, Manager } from "./directory";
@@ -61,7 +62,7 @@ export function firebaseRepository(config: Config): Repository {
   const workspace = config.workspaceId || "lr-capital";
   if (!/^[\w-]{1,64}$/.test(workspace)) throw new Error("Workspace inválido.");
   const root = `lr_v2_workspaces/${workspace}`;
-  let membershipUnsub: (() => void) | undefined;
+  let retryAccess = async () => {};
   const repo: Repository = {
     mode: "firebase",
     passwordLoginEnabled: config.passwordLoginEnabled !== false,
@@ -183,67 +184,48 @@ export function firebaseRepository(config: Config): Repository {
       });
     },
     session: null,
+    retryAccess() { return retryAccess(); },
     authListener(callback) {
-      getRedirectResult(auth).catch(() => callback(null, "O acesso Google não foi concluído. Tente novamente com a conta habilitada."));
-      let generation=0;
-      const unsub = onAuthStateChanged(auth, async (user) => {
-        const currentGeneration=++generation;
-        membershipUnsub?.();
-        repo.session = null;
-        if (!user) {
-          callback(null);
-          return;
-        }
-        // An invitation can be claimed once, only by its verified Google identity.
-        try {
-          await runTransaction(db,async tx=>{
-            const target=doc(db,root,"members",user.uid),existing=await tx.get(target);
-            if(existing.exists()||!user.email||!user.emailVerified||!user.providerData.some(p=>p.providerId==="google.com"))return;
-            const inviteRef=doc(db,root,"invitations",user.email.toLowerCase()),invite=await tx.get(inviteRef),data=invite.data();
-            if(!data?.active||data.claimedUid)return;
-            tx.set(target,{name:data.name,email:data.email,role:data.role,active:true});
-            tx.update(inviteRef,{claimedUid:user.uid,version:data.version+1,updatedAt:serverTimestamp(),updatedBy:user.uid});
-          });
-        } catch (e) {
-          if(currentGeneration!==generation)return;
-          callback(null,serviceErrorText(e,"Não foi possível ativar seu convite. Confira com o administrador o e-mail da conta Google."));
-          return;
-        }
-        if(currentGeneration!==generation)return;
-        membershipUnsub = onSnapshot(
-          doc(db, root, "members", user.uid),
-          (snap) => {
-            const profile = snap.data();
-            if (
-              !snap.exists() ||
-              profile?.active !== true ||
-              !["admin", "editor", "reader"].includes(profile?.role)
-            ) {
-              repo.session = null;
-              callback(
-                null,
-                "Sua conta ainda não tem acesso ativo à equipe. Peça ao administrador para habilitá-la.",
-              );
-              return;
-            }
-            repo.session = {
-              uid: user.uid,
-              name: profile.name || user.email || "Equipe",
-              email: user.email || "",
-              role: profile.role,
-            } as Session;
-            callback(repo.session);
-          },
-          (e) => {
-            repo.session = null;
-            callback(null, serviceErrorText(e, "Não foi possível verificar o acesso da conta."));
-          },
-        );
+      let disposed = false;
+      const access = createAccessController({
+        publish(session, error, state) {
+          repo.session = session;
+          callback(session, error, state);
+        },
+        async resolve(identity) {
+          const user = auth.currentUser;
+          if (!user || user.uid !== identity.uid) throw Error("A conta mudou.");
+          // Read the existing membership before considering an invitation. A
+          // single attempt preserves quota errors instead of retrying five times.
+          return runTransaction(db, async tx => {
+            const target = doc(db, root, "members", user.uid), existing = await tx.get(target);
+            if (existing.exists()) return existing.data() as AccessProfile;
+            if (!user.email || !user.emailVerified || !user.providerData.some(p => p.providerId === "google.com")) return;
+            const inviteRef = doc(db, root, "invitations", user.email.toLowerCase());
+            const invite = await tx.get(inviteRef), data = invite.data();
+            if (!data?.active || data.claimedUid) return;
+            const profile = { name: data.name, email: data.email, role: data.role, active: true };
+            tx.set(target, profile);
+            tx.update(inviteRef, { claimedUid: user.uid, version: data.version + 1, updatedAt: serverTimestamp(), updatedBy: user.uid });
+            return profile as AccessProfile;
+          }, { maxAttempts: 1 });
+        },
+        watch(user, next, error) {
+          return onSnapshot(doc(db, root, "members", user.uid), { includeMetadataChanges: true }, snap => {
+            if (!snap.metadata.fromCache && !snap.metadata.hasPendingWrites) next(snap.data() as AccessProfile | undefined);
+          }, error);
+        },
       });
+      retryAccess = () => access.check(auth.currentUser);
+      getRedirectResult(auth).catch(() => {
+        if (!disposed && !auth.currentUser) callback(null, "O acesso Google não foi concluído. Tente novamente com a conta habilitada.");
+      });
+      const unsub = onAuthStateChanged(auth, user => { void access.check(user); });
       return () => {
-        generation++;
+        disposed = true;
         unsub();
-        membershipUnsub?.();
+        access.stop();
+        retryAccess = async () => {};
       };
     },
     async login(email, password) {
